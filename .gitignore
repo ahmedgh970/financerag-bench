@@ -1,3 +1,14 @@
+# Project-specific
+.env
+.env.local
+data/vectorstores/
+data/processed/
+benchmarks/*.json
+benchmarks/*.csv
+!benchmarks/.gitkeep
+langfuse.db
+.cache/huggingface/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
@@ -216,3 +227,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
