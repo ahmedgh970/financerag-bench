@@ -86,3 +86,8 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "eval: marks evaluation tests (require API keys)",
 ]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+]
