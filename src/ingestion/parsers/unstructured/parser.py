@@ -2,15 +2,28 @@
 
 from __future__ import annotations
 
+from unstructured.documents.elements import Element
+from unstructured.partition.pdf import partition_pdf
 
-def parse(pdf_path: str):
-    """Parse ``pdf_path`` with Unstructured.
 
-    Returns the native ``list[Element]`` (typed blocks: Title, NarrativeText,
-    Table, ...). The Unstructured chunkers in ``chunkers.py`` consume this list.
+def parse(
+    pdf_path: str, strategy: str = "hi_res", infer_table_structure: bool = True, **kwargs
+) -> list[Element]:
+    """Parse ``pdf_path`` with Unstructured into typed elements.
 
-    Choose the partition strategy via params later if needed ("fast" vs
-    "hi_res"); "hi_res" is slower but reconstructs tables (text_as_html).
+    Args:
+        strategy: ``"hi_res"`` (layout model, reconstructs tables — the relevant
+            default for financial filings) or ``"fast"`` (native text only, no
+            tables, much quicker).
+        infer_table_structure: keep table structure as HTML (only used by
+            ``hi_res``).
+        kwargs: forwarded to ``partition_pdf``.
+
+    The Unstructured chunkers consume the returned ``list[Element]`` directly.
     """
-    # TODO: call partition_pdf(pdf_path, strategy=...) and return the elements.
-    raise NotImplementedError
+    return partition_pdf(
+        filename=pdf_path,
+        strategy=strategy,
+        infer_table_structure=infer_table_structure,
+        **kwargs,
+    )
