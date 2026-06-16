@@ -38,7 +38,7 @@ dependencies = [
     "tqdm>=4.66.0",
     "tenacity>=8.3.0",
     "tiktoken>=0.7.0",
-    "unstructured>=0.21.5",
+    "unstructured[pdf]>=0.21.5",
 ]
 
 [project.optional-dependencies]
