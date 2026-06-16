@@ -14,11 +14,12 @@ def ingest(pdf_path: str, config) -> list[Chunk]:
     ``config`` is expected to carry at least:
         - ``parser``: parser name (e.g. "docling")
         - ``chunker``: chunker name valid for that parser (e.g. "hybrid")
-        - ``chunker_params``: dict of kwargs forwarded to the chunker
+        - ``parser_params``: dict of kwargs forwarded to the parser (optional)
+        - ``chunker_params``: dict of kwargs forwarded to the chunker (optional)
 
     The chunker receives the parser's native output and returns ``list[Chunk]``.
     """
     parse, chunk = resolve(config.parser, config.chunker)
-    native = parse(pdf_path)
+    native = parse(pdf_path, **getattr(config, "parser_params", {}))
     doc_id = Path(pdf_path).stem
     return chunk(native, doc_id=doc_id, **getattr(config, "chunker_params", {}))
