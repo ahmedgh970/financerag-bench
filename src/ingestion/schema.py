@@ -18,9 +18,9 @@ class Chunk(BaseModel):
         chunk_id: Stable unique id (e.g. ``f"{doc_id}::{index}"``).
         doc_id: Source document id (usually the PDF stem).
         text: The chunk text, ready to embed / index.
-        page: 1-based source page number. Crucial for evidence↔chunk matching
-            during retrieval evaluation (Week 2). Use the first page the chunk
-            spans when it crosses a page boundary.
+        page: 1-based source page number. Used for evidence↔chunk matching in
+            retrieval evaluation. Use the first page the chunk spans when it
+            crosses a page boundary.
         metadata: Free-form extras (parser name, chunker name, section title,
             element type, bounding box, token count...). Kept open on purpose so
             each parser/chunker can attach what it has without changing the schema.
