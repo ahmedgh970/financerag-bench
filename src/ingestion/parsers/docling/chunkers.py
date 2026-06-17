@@ -29,6 +29,12 @@ def _to_chunks(chunker: BaseChunker, doc, doc_id: str, name: str) -> list[Chunk]
     Text is contextualized (section headings prepended) so each chunk is
     self-contained for retrieval; the page is the first page the chunk spans,
     read from element provenance.
+
+    Metadata attached per chunk:
+        - ``headings`` | Optional[list[str]]: section headings the chunk belongs to, else ``None``.
+        - ``labels``: element types composing the chunk (e.g. "text", "table",
+            "section_header") — lets downstream spot table-bearing chunks.
+        - ``captions`` | Optional[list[str]]: table/figure captions when present, else ``None``.
     """
     chunks: list[Chunk] = []
     for i, dc in enumerate(chunker.chunk(doc)):
@@ -39,7 +45,13 @@ def _to_chunks(chunker: BaseChunker, doc, doc_id: str, name: str) -> list[Chunk]
                 doc_id=doc_id,
                 text=chunker.contextualize(dc),
                 page=min(pages) if pages else 1,
-                metadata={"parser": "docling", "chunker": name, "headings": dc.meta.headings},
+                metadata={
+                    "parser": "docling",
+                    "chunker": name,
+                    "headings": dc.meta.headings,
+                    "labels": [str(it.label) for it in dc.meta.doc_items],
+                    "captions": dc.meta.captions,
+                },
             )
         )
     return chunks
