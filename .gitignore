@@ -4,6 +4,8 @@ docs/*.md
 # Project-specific
 .env
 .env.local
+notebookss
+data/fewpdfs/
 data/vectorstores/
 data/processed/
 benchmarks/*.json

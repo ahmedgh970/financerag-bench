@@ -1,0 +1,10 @@
+# Parse stage: Unstructured. Run once -> data/processed/unstructured/parsed/{doc_id}.json
+# make parse CONFIG=configs/parse_unstructured.yaml
+
+parser: unstructured
+parser_params:
+  strategy: hi_res              # layout model + tables (fair comparison vs Docling)
+  infer_table_structure: true
+  languages: [eng]
+
+pdf_dir: data/pdfs
