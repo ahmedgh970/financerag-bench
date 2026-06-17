@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from docling.datamodel.base_models import ConversionStatus, InputFormat
 from docling.datamodel.document import DoclingDocument
 from docling.datamodel.pipeline_options import PdfPipelineOptions, TableFormerMode
@@ -55,3 +57,15 @@ def parse(
     if result.status == ConversionStatus.FAILURE:
         raise RuntimeError(f"Docling failed to convert {pdf_path}: {result.errors}")
     return result.document
+
+
+def save(doc: DoclingDocument, path: str) -> None:
+    """Serialize a DoclingDocument to JSON on disk (lossless)."""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(doc.model_dump_json(), encoding="utf-8")
+
+
+def load(path: str) -> DoclingDocument:
+    """Load a DoclingDocument previously written by ``save``."""
+    return DoclingDocument.model_validate_json(Path(path).read_text(encoding="utf-8"))
