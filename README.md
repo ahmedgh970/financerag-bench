@@ -1,6 +1,6 @@
 # financerag-bench
 
-> End-to-end RAG & Agentic RAG benchmark on [FinanceBench](https://github.com/patronus-ai/financebench) — 150 financial QA pairs, 84 SEC filings (10-K/10-Q).
+> End-to-end RAG & Agentic RAG benchmark on [FinanceBench](https://github.com/patronus-ai/financebench) — 150 financial QA pairs, 368 SEC filings (10-K/10-Q).
 > From naive retrieval to multi-agent system, every improvement is justified by a number.
 
 ![CI](https://github.com/ahmedgh970/financerag-bench/actions/workflows/ci.yml/badge.svg)
@@ -59,7 +59,7 @@ financerag-bench/
 ├── docs/                          # ADRs, benchmark reports
 ├── configs/                       # 1 YAML = 1 reproducible experiment
 ├── data/
-│   ├── pdfs/                      # 84 SEC filings (10-K/10-Q)
+│   ├── pdfs/                      # 368 docs
 │   ├── jsons/                     # 150 QA pairs (FinanceBench open-source)
 │   └── processed/                 # chunks, embeddings
 ├── src/
