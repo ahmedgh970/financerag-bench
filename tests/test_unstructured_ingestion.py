@@ -39,3 +39,4 @@ def test_ingest_emits_valid_chunks(pdf_path, chunker):
     assert len({c.chunk_id for c in chunks}) == len(chunks), "duplicate chunk_id"
     assert all(c.doc_id == PDF.stem for c in chunks), "wrong doc_id"
     assert all(c.metadata["chunker"] == chunker for c in chunks), "wrong chunker tag"
+    assert all(isinstance(c.metadata["labels"], list) for c in chunks), "labels not a list"
