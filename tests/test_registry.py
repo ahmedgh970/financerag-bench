@@ -1,28 +1,14 @@
-"""Fast unit tests for the parser/chunker registry (no parsing involved)."""
+"""Fast unit tests for the parser registry."""
 
-import pytest
-
-from src.ingestion.registry import PARSERS, resolve
+from src.ingestion.registry import PARSERS
 
 
-def test_resolve_returns_callables():
-    parse_fn, chunk_fn = resolve("docling", "hybrid")
-    assert callable(parse_fn)
-    assert callable(chunk_fn)
-
-
-def test_resolve_unknown_parser_raises():
-    with pytest.raises(ValueError, match="Unknown parser"):
-        resolve("does-not-exist", "hybrid")
-
-
-def test_resolve_unknown_chunker_raises():
-    with pytest.raises(ValueError, match="has no chunker"):
-        resolve("docling", "does-not-exist")
-
-
-def test_every_parser_exposes_chunkers():
-    # Each registered parser must expose at least one chunker, all callable.
+def test_every_parser_exposes_parse_save_load_and_chunkers():
+    # Each registered parser must expose the parse/save/load API and at least
+    # one callable chunker.
     for name, mod in PARSERS.items():
+        assert callable(mod.parse), f"parser '{name}' has no parse()"
+        assert callable(mod.save), f"parser '{name}' has no save()"
+        assert callable(mod.load), f"parser '{name}' has no load()"
         assert mod.CHUNKERS, f"parser '{name}' exposes no chunkers"
         assert all(callable(fn) for fn in mod.CHUNKERS.values())
