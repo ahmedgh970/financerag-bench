@@ -15,16 +15,28 @@ from src.ingestion.schema import Chunk
 
 
 def _to_chunks(elements, doc_id: str, name: str) -> list[Chunk]:
-    """Map chunked Unstructured elements to the shared Chunk contract."""
+    """Map chunked Unstructured elements to the shared Chunk contract.
+
+    Metadata attached per chunk:
+        - ``labels``: categories of the original elements composing the chunk
+            (e.g. "Title", "NarrativeText", "Table") — lets downstream spot
+            table-bearing chunks. Mirrors the Docling chunkers' ``labels``.
+            Empty when the chunker was run with ``include_orig_elements=False``.
+    """
     chunks: list[Chunk] = []
     for i, el in enumerate(elements):
+        orig = el.metadata.orig_elements or []
         chunks.append(
             Chunk(
                 chunk_id=f"{doc_id}::{i}",
                 doc_id=doc_id,
                 text=el.text,
                 page=el.metadata.page_number or 1,
-                metadata={"parser": "unstructured", "chunker": name, "category": el.category},
+                metadata={
+                    "parser": "unstructured",
+                    "chunker": name,
+                    "labels": [e.category for e in orig],
+                },
             )
         )
     return chunks
