@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from unstructured.documents.elements import Element
 from unstructured.partition.pdf import partition_pdf
+from unstructured.staging.base import elements_from_json, elements_to_json
 
 
 def parse(
@@ -35,3 +38,15 @@ def parse(
         languages=languages or ["eng"],
         **kwargs,
     )
+
+
+def save(elements: list[Element], path: str) -> None:
+    """Serialize a list of Unstructured elements to JSON on disk."""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(elements_to_json(elements), encoding="utf-8")
+
+
+def load(path: str) -> list[Element]:
+    """Load Unstructured elements previously written by ``save``."""
+    return elements_from_json(text=Path(path).read_text(encoding="utf-8"))
