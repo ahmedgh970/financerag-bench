@@ -1,0 +1,6 @@
+# Chunk stage: Unstructured basic (reads data/processed/unstructured/parsed/).
+# make chunk CONFIG=configs/chunk_unstructured_basic.yaml
+
+parser: unstructured
+chunker: basic
+chunker_params: {}
