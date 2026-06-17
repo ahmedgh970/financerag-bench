@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format test test-fast ingest eval benchmark serve docker-up docker-down clean
+.PHONY: help install install-dev lint format test test-fast parse chunk eval benchmark serve docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/baseline.yaml
@@ -12,7 +12,8 @@ help:
 	@echo "  make format         Run ruff format"
 	@echo "  make test           Run all tests"
 	@echo "  make test-fast      Run fast tests only (skip slow/eval)"
-	@echo "  make ingest         Parse all PDFs and build index"
+	@echo "  make parse          Parse corpus once -> data/processed/PARSER/parsed/ (CONFIG=...)"
+	@echo "  make chunk          Chunk parsed docs -> chunks.jsonl (CONFIG=...)"
 	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
 	@echo "  make benchmark      Run full benchmark suite"
 	@echo "  make serve          Start FastAPI server"
@@ -40,8 +41,11 @@ test:
 test-fast:
 	uv run pytest tests/ -v -m "not slow and not eval"
 
-ingest:
-	uv run python -m src.ingestion.runner
+parse:
+	uv run python -m src.ingestion.run parse --config $(CONFIG)
+
+chunk:
+	uv run python -m src.ingestion.run chunk --config $(CONFIG)
 
 eval:
 	uv run python -m src.evaluation.runner --config $(CONFIG)
