@@ -3,7 +3,7 @@
 
 parser: unstructured
 parser_params:
-  strategy: hi_res              # layout model + tables (fair comparison vs Docling)
+  strategy: hi_res              # hi_res layout model + tables (fair comparison vs Docling) or ``"fast"`` (native text only, no tables, much quicker)
   infer_table_structure: true
   languages: [eng]
 
