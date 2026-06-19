@@ -9,7 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from src.ingestion.parsers import docling, unstructured
+# Skip this whole module when the optional ingestion stack is absent (e.g. the
+# fast CI environment that installs only the core + dev deps).
+pytest.importorskip("docling")
+pytest.importorskip("unstructured")
+
+from src.ingestion.parsers import docling, unstructured  # noqa: E402
 
 PDF = Path(__file__).parents[1] / "data/pdfs/JOHNSON_JOHNSON_2023_8K_dated-2023-08-23.pdf"
 DOC_ID = PDF.stem
