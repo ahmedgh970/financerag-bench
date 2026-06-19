@@ -21,7 +21,8 @@ def parse(
     Args:
         strategy: ``"hi_res"`` (layout model, reconstructs tables — the relevant
             default for financial filings) or ``"fast"`` (native text only, no
-            tables, much quicker).
+            tables, much quicker) or ``"ocr-only"``(extracts the text from the
+        document using OCR and processes it).
         infer_table_structure: keep table structure as HTML (only used by
             ``hi_res``).
         languages: OCR/text languages; defaults to ``["eng"]``. Setting it
