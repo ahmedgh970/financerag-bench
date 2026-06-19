@@ -1,0 +1,9 @@
+# Index stage: embed docling/hybrid chunks into a Qdrant collection.
+# make index CONFIG=configs/index_docling_hybrid.yaml
+
+chunks_path: data/processed/docling_hybrid/chunks.jsonl
+collection_name: docling_hybrid_bge-m3
+
+embedding_model: BAAI/bge-m3          # default; override to compare embedders
+# qdrant_location: http://localhost:6333   # default (or QDRANT_URL env)
+recreate: true

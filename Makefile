@@ -1,4 +1,4 @@
-.PHONY: help install install-dev lint format test test-fast parse chunk eval benchmark serve docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index eval benchmark serve docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/baseline.yaml
@@ -6,14 +6,15 @@ CONFIG ?= configs/baseline.yaml
 help:
 	@echo "financerag-bench — available commands:"
 	@echo ""
-	@echo "  make install        Install runtime dependencies (uv)"
-	@echo "  make install-dev    Install all deps including dev + pre-commit"
+	@echo "  make install        Install runtime (deployable) dependencies only"
+	@echo "  make install-all    Install every extra (ingestion, dev, dashboard, demo) + pre-commit"
 	@echo "  make lint           Run ruff lint"
 	@echo "  make format         Run ruff format"
 	@echo "  make test           Run all tests"
 	@echo "  make test-fast      Run fast tests only (skip slow/eval)"
 	@echo "  make parse          Parse corpus once -> data/processed/PARSER/parsed/ (CONFIG=...)"
 	@echo "  make chunk          Chunk parsed docs -> chunks.jsonl (CONFIG=...)"
+	@echo "  make index          Embed chunks.jsonl -> Qdrant collection (CONFIG=...)"
 	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
 	@echo "  make benchmark      Run full benchmark suite"
 	@echo "  make serve          Start FastAPI server"
@@ -24,8 +25,8 @@ help:
 install:
 	uv sync
 
-install-dev:
-	uv sync --extra dev
+install-all:
+	uv sync --extra ingestion --extra dev --extra dashboard --extra demo
 	uv run pre-commit install
 
 lint:
@@ -36,16 +37,19 @@ format:
 	uv run ruff check --fix src/ tests/
 
 test:
-	uv run pytest tests/ -v
+	uv run --extra ingestion --extra dev pytest tests/ -v
 
 test-fast:
-	uv run pytest tests/ -v -m "not slow and not eval"
+	uv run --extra dev pytest tests/ -v -m "not slow and not eval"
 
 parse:
-	uv run python -m src.ingestion.run parse --config $(CONFIG)
+	uv run --extra ingestion python -m src.ingestion.run parse --config $(CONFIG)
 
 chunk:
-	uv run python -m src.ingestion.run chunk --config $(CONFIG)
+	uv run --extra ingestion python -m src.ingestion.run chunk --config $(CONFIG)
+
+index:
+	uv run python -m src.retrieval.index_runner --config $(CONFIG)
 
 eval:
 	uv run python -m src.evaluation.runner --config $(CONFIG)
