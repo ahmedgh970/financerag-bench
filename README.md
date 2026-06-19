@@ -40,10 +40,11 @@ FinanceBench shows that state-of-the-art RAG systems fail on ~80% of financial q
 docker compose up -d
 
 # 2. Install dependencies
-make install-dev
+make install-all
 
-# 3. Ingest documents
-make ingest
+# 3. Parse + chunk documents
+make parse CONFIG=configs/parse_docling.yaml
+make chunk CONFIG=configs/chunk_docling_hybrid.yaml
 
 # 4. Run evaluation
 make eval CONFIG=configs/baseline.yaml

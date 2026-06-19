@@ -5,9 +5,6 @@ description = "RAG & Agentic RAG benchmark on FinanceBench — from naive to mul
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    # PDF parsing
-    "pymupdf>=1.24.0",
-    "docling>=2.0.0",
     # Data handling
     "pandas>=2.0.0",
     "pydantic>=2.0.0",
@@ -16,8 +13,9 @@ dependencies = [
     "litellm>=1.40.0",
     # Vector DB
     "qdrant-client>=1.9.0",
-    # Embeddings
+    # Embeddings (needed at serving time to embed queries)
     "sentence-transformers>=3.0.0",
+    "torch>=2.2.0",
     # BM25
     "rank-bm25>=0.2.2",
     # Evaluation
@@ -38,10 +36,18 @@ dependencies = [
     "tqdm>=4.66.0",
     "tenacity>=8.3.0",
     "tiktoken>=0.7.0",
-    "unstructured[pdf]>=0.21.5",
+    "datasets>=3.0",
+    "pytest>=9.1.0",
 ]
 
 [project.optional-dependencies]
+# Offline PDF parsing stack (GPU). Not needed by the deployable serving app.
+ingestion = [
+    "pymupdf>=1.24.0",
+    "docling>=2.0.0",
+    "unstructured[pdf]>=0.21.5",
+    "onnxruntime-gpu==1.26.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
@@ -56,6 +62,20 @@ dashboard = [
 demo = [
     "gradio>=4.36.0",
 ]
+
+# Pin torch to a CUDA 12.1 build: compatible with onnxruntime-gpu (CUDA 12) and
+# with both target drivers (local CUDA 13, server CUDA 12.2). Drop the CPU
+# onnxruntime so it never clashes with onnxruntime-gpu (same import module).
+[tool.uv]
+override-dependencies = ["onnxruntime; sys_platform == 'never'"]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

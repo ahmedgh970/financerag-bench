@@ -5,6 +5,6 @@ parser: docling
 parser_params:
   do_ocr: false              # SEC filings are born-digital; OCR adds time, not text
   do_table_structure: true   # tables carry the answers on FinanceBench
-  table_mode: accurate       # "accurate" | "fast"
+  table_mode: fast           # "accurate" | "fast"
 
 pdf_dir: data/pdfs
