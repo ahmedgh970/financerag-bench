@@ -1,6 +1,14 @@
 """Fast unit tests for the parser registry."""
 
-from src.ingestion.registry import PARSERS
+import pytest
+
+# The registry imports the parser packages, which import docling/unstructured at
+# module load. Skip this module when the optional ingestion stack is absent
+# (e.g. the light CI that installs only core + dev).
+pytest.importorskip("docling")
+pytest.importorskip("unstructured")
+
+from src.ingestion.registry import PARSERS  # noqa: E402
 
 
 def test_every_parser_exposes_parse_save_load_and_chunkers():
