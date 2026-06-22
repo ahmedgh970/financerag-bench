@@ -10,7 +10,7 @@ from __future__ import annotations
 from qdrant_client import QdrantClient
 
 from src.retrieval.base import ScoredChunk
-from src.retrieval.embeddings import DEFAULT_MODEL, embed_texts
+from src.retrieval.embeddings import embed_texts
 from src.retrieval.qdrant_store import chunk_from_payload
 
 
@@ -21,7 +21,7 @@ class DenseRetriever:
     the query and stored vectors live in different spaces.
     """
 
-    def __init__(self, client: QdrantClient, collection_name: str, model_name: str = DEFAULT_MODEL):
+    def __init__(self, client: QdrantClient, collection_name: str, model_name: str):
         self.client = client
         self.collection_name = collection_name
         self.model_name = model_name

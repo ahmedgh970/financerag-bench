@@ -3,7 +3,8 @@
 
 chunks_path: data/processed/docling_hybrid/chunks.jsonl
 collection_name: docling_hybrid_bge-m3
-
+embed_batch_size: 64
+upsert_batch_size: 128
 embedding_model: BAAI/bge-m3          # default; override to compare embedders
-# qdrant_location: http://localhost:6333   # default (or QDRANT_URL env)
-recreate: true
+#qdrant_location: http://localhost:6333   # default; QDRANT_URL env or http://localhost:6333)
+recreate: false    # false = resume (skip already-indexed); true = fresh (drop + reindex all)

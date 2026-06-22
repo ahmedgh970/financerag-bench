@@ -8,8 +8,6 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
-from src.retrieval.embeddings import DEFAULT_MODEL
-
 
 class IndexConfig(BaseModel):
     """Parameters of a single indexing run: chunks -> embeddings -> Qdrant.
@@ -20,11 +18,12 @@ class IndexConfig(BaseModel):
 
     chunks_path: str
     collection_name: str
-    embedding_model: str = DEFAULT_MODEL
+    embedding_model: str = "BAAI/bge-m3"
     qdrant_location: str = Field(
         default_factory=lambda: os.getenv("QDRANT_URL", "http://localhost:6333")
     )
-    batch_size: int = 128
+    upsert_batch_size: int = 128  # chunks per Qdrant upsert call
+    embed_batch_size: int = 32  # texts per GPU forward (raise to speed up if memory allows)
     recreate: bool = False
 
 

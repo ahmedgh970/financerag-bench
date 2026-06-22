@@ -26,17 +26,23 @@ def run(config: IndexConfig) -> str:
     client = get_client(config.qdrant_location)
     dim = embedding_dim(config.embedding_model)
     create_collection(client, config.collection_name, dim, recreate=config.recreate)
-    n = upsert_chunks(
+
+    # recreate=False means "resume": skip chunks already indexed.
+    written = upsert_chunks(
         client,
         config.collection_name,
         chunks,
         model_name=config.embedding_model,
-        batch_size=config.batch_size,
+        upsert_batch_size=config.upsert_batch_size,
+        embed_batch_size=config.embed_batch_size,
+        skip_existing=not config.recreate,
     )
 
+    skipped = len(chunks) - written
     print(
-        f"Indexed {n} chunks -> collection '{config.collection_name}' "
-        f"({dim}-d, {config.embedding_model}) @ {config.qdrant_location}"
+        f"Indexed {written} new chunks (skipped {skipped} already present) -> "
+        f"collection '{config.collection_name}' ({dim}-d, {config.embedding_model}) "
+        f"@ {config.qdrant_location}"
     )
     return config.collection_name
 
