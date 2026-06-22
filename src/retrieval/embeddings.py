@@ -10,8 +10,6 @@ from __future__ import annotations
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-DEFAULT_MODEL = "BAAI/bge-m3"
-
 _models: dict[str, SentenceTransformer] = {}
 
 
@@ -26,14 +24,12 @@ def _get_model(model_name: str) -> SentenceTransformer:
     return _models[model_name]
 
 
-def embedding_dim(model_name: str = DEFAULT_MODEL) -> int:
+def embedding_dim(model_name: str) -> int:
     """Output dimensionality of ``model_name`` (e.g. 1024 for BGE-M3)."""
     return _get_model(model_name).get_embedding_dimension()
 
 
-def embed_texts(
-    texts: list[str], model_name: str = DEFAULT_MODEL, batch_size: int = 32
-) -> np.ndarray:
+def embed_texts(texts: list[str], model_name: str, batch_size: int = 32) -> np.ndarray:
     """Embed ``texts`` into an L2-normalized ``(len(texts), dim)`` array."""
     model = _get_model(model_name)
     return model.encode(
