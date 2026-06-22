@@ -15,13 +15,10 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from tqdm import tqdm
 
 from src.ingestion.schema import Chunk
-from src.retrieval.embeddings import DEFAULT_MODEL, embed_texts
-
-# Default local store: an on-disk folder (persisted across runs, gitignored).
-DEFAULT_LOCATION = "data/vectorstores/qdrant"
+from src.retrieval.embeddings import embed_texts
 
 
-def get_client(location: str = DEFAULT_LOCATION) -> QdrantClient:
+def get_client(location: str) -> QdrantClient:
     """Return a configured ``QdrantClient``.
 
     ``location`` selects where Qdrant lives:
@@ -62,24 +59,49 @@ def _point_id(chunk_id: str) -> str:
     return str(uuid.uuid5(uuid.NAMESPACE_URL, chunk_id))
 
 
+def _existing_ids(client: QdrantClient, name: str, ids: list[str]) -> set[str]:
+    """Return the subset of ``ids`` already present in collection ``name``."""
+    found = client.retrieve(collection_name=name, ids=ids, with_payload=False, with_vectors=False)
+    return {str(r.id) for r in found}
+
+
 def upsert_chunks(
     client: QdrantClient,
     name: str,
     chunks: Iterable[Chunk],
-    model_name: str = DEFAULT_MODEL,
-    batch_size: int = 128,
+    model_name: str,
+    upsert_batch_size: int = 128,
+    embed_batch_size: int = 32,
+    skip_existing: bool = False,
 ) -> int:
     """Embed ``chunks`` and upsert them as points into collection ``name``.
 
     Each chunk becomes one point: vector = embedding of ``chunk.text``, payload =
-    the chunk fields needed to rebuild it on retrieval. Processed in batches to
-    bound memory. Returns the number of points written.
+    the chunk fields needed to rebuild it on retrieval.
+
+    Two batch sizes, tuning different things:
+        - ``upsert_batch_size``: chunks gathered per Qdrant upsert call (network/write).
+        - ``embed_batch_size``: texts per GPU forward in the embedder (memory).
+          Keep it small for large embedders on a small GPU (BGE-M3 on 8 GB OOMs
+          well before 256); raise it to speed up if memory allows.
+
+    With ``skip_existing=True`` chunks already present (by point id) are not
+    re-embedded, making the run resumable: re-launch after an interruption and it
+    continues where it left off. Returns the number of points actually written.
     """
     chunks = list(chunks)
+    written = 0
     desc = f"index [{name}]"
-    for start in tqdm(range(0, len(chunks), batch_size), desc=desc, unit="batch"):
-        batch = chunks[start : start + batch_size]
-        vectors = embed_texts([c.text for c in batch], model_name=model_name)
+    for start in tqdm(range(0, len(chunks), upsert_batch_size), desc=desc, unit="batch"):
+        batch = chunks[start : start + upsert_batch_size]
+        if skip_existing:
+            present = _existing_ids(client, name, [_point_id(c.chunk_id) for c in batch])
+            batch = [c for c in batch if _point_id(c.chunk_id) not in present]
+        if not batch:
+            continue
+        vectors = embed_texts(
+            [c.text for c in batch], model_name=model_name, batch_size=embed_batch_size
+        )
         points = [
             PointStruct(
                 id=_point_id(c.chunk_id),
@@ -95,7 +117,8 @@ def upsert_chunks(
             for i, c in enumerate(batch)
         ]
         client.upsert(collection_name=name, points=points)
-    return len(chunks)
+        written += len(points)
+    return written
 
 
 def chunk_from_payload(payload: dict) -> Chunk:
