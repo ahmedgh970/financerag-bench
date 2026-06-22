@@ -96,3 +96,14 @@ def upsert_chunks(
         ]
         client.upsert(collection_name=name, points=points)
     return len(chunks)
+
+
+def chunk_from_payload(payload: dict) -> Chunk:
+    """Rebuild a Chunk from a point payload (inverse of the payload built above)."""
+    return Chunk(
+        chunk_id=payload["chunk_id"],
+        doc_id=payload["doc_id"],
+        text=payload["text"],
+        page=payload["page"],
+        metadata=payload.get("metadata", {}),
+    )
