@@ -1,6 +1,0 @@
-# Chunk stage: Unstructured by_title (reads data/processed/unstructured/parsed/).
-# make chunk CONFIG=configs/chunk_unstructured_by_title.yaml
-
-parser: unstructured
-chunker: by_title
-chunker_params: {}
