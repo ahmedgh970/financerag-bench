@@ -1,0 +1,2 @@
+chunks_path: data/processed/docling_hybrid/chunks.jsonl
+collection_name: docling_hybrid_bge-m3
