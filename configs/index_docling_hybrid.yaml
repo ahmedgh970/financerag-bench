@@ -3,8 +3,8 @@
 
 chunks_path: data/processed/docling_hybrid/chunks.jsonl
 collection_name: docling_hybrid_bge-m3
-embed_batch_size: 64
+embed_batch_size: 128   # short chunks + fp16 weights leave VRAM headroom; raise to 256 if it fits
 upsert_batch_size: 128
 embedding_model: BAAI/bge-m3          # default; override to compare embedders
 #qdrant_location: http://localhost:6333   # default; QDRANT_URL env or http://localhost:6333)
-recreate: false    # false = resume (skip already-indexed); true = fresh (drop + reindex all)
+recreate: true    # false = resume (skip already-indexed); true = fresh (drop + reindex all)
