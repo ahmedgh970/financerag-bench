@@ -3,4 +3,6 @@
 
 parser: docling
 chunker: hybrid
-chunker_params: {}
+chunker_params:
+  max_tokens: 512              # token budget per chunk (vs Docling default 256)
+  tokenizer_model: BAAI/bge-m3 # count the budget in the embedder's tokenizer
