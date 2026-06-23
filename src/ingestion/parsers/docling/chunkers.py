@@ -7,8 +7,12 @@ Docling ships exactly two chunkers (verified against ``docling.chunking``):
 from __future__ import annotations
 
 from docling.chunking import BaseChunker, HierarchicalChunker, HybridChunker
+from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+from transformers import AutoTokenizer
 
 from src.ingestion.schema import Chunk
+
+DEFAULT_TOKENIZER_MODEL = "BAAI/bge-m3"
 
 # Cache HybridChunker instances by their params: building one loads a tokenizer,
 # so reuse it across documents sharing the same config. Keyed on params so a
@@ -16,10 +20,26 @@ from src.ingestion.schema import Chunk
 _hybrid_cache: dict[tuple, HybridChunker] = {}
 
 
-def _get_hybrid_chunker(**params) -> HybridChunker:
+def _get_hybrid_chunker(params: dict) -> HybridChunker:
+    """Build (and cache) a HybridChunker for ``params``.
+
+    ``max_tokens`` (and optional ``tokenizer_model``, default BGE-M3) are turned
+    into a ``HuggingFaceTokenizer`` so the token budget is aligned with the model
+    that will embed the chunks — Docling deprecated passing ``max_tokens`` direct.
+    Without ``max_tokens`` nor ``tokenizer_model``, Docling's default tokenizer
+    (all-MiniLM-L6-v2, 256-token budget) is used. Remaining params pass through.
+    """
     key = tuple(sorted(params.items()))
     if key not in _hybrid_cache:
-        _hybrid_cache[key] = HybridChunker(**params)
+        kwargs = dict(params)
+        max_tokens = kwargs.pop("max_tokens", None)
+        tokenizer_model = kwargs.pop("tokenizer_model", None)
+        if max_tokens is not None or tokenizer_model is not None:
+            kwargs["tokenizer"] = HuggingFaceTokenizer(
+                tokenizer=AutoTokenizer.from_pretrained(tokenizer_model or DEFAULT_TOKENIZER_MODEL),
+                max_tokens=max_tokens,
+            )
+        _hybrid_cache[key] = HybridChunker(**kwargs)
     return _hybrid_cache[key]
 
 
@@ -61,15 +81,14 @@ def hybrid_chunk(doc, doc_id: str, **params) -> list[Chunk]:
     """Token-aware, structure-aware chunking via Docling's ``HybridChunker``.
 
     Splits along the document structure, then merges/splits to respect a token
-    budget. ``params`` are forwarded to ``HybridChunker``.
-
-    To set a custom token budget, pass a ``tokenizer`` built from the embedding
-    model (``HuggingFaceTokenizer(tokenizer=..., max_tokens=...)``); the token
-    budget only makes sense when aligned with the model that will embed the
-    chunks. Passing ``max_tokens`` directly is deprecated by Docling. With no
-    params, Docling's default tokenizer is used.
+    budget. Useful ``params`` (from ``chunker_params`` in the YAML):
+        - ``max_tokens``: token budget per chunk (e.g. 512). The budget only makes
+            sense in the tokenizer of the model that will embed the chunks.
+        - ``tokenizer_model``: HF model whose tokenizer counts the budget
+            (default ``BAAI/bge-m3``); only applied when a budget is set.
+    With neither, Docling's default tokenizer (all-MiniLM-L6-v2, 256) is used.
     """
-    return _to_chunks(_get_hybrid_chunker(**params), doc, doc_id, "hybrid")
+    return _to_chunks(_get_hybrid_chunker(params), doc, doc_id, "hybrid")
 
 
 def hierarchical_chunk(doc, doc_id: str, **params) -> list[Chunk]:
