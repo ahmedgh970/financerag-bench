@@ -18,8 +18,11 @@ def _get_model(model_name: str) -> SentenceTransformer:
         # Force safetensors weights: torch 2.5.1 (pinned for the cu121 GPU stack)
         # is below the 2.6 that transformers now requires to load legacy .bin
         # checkpoints (CVE-2025-32434). safetensors loading is exempt.
+        # fp16 weights ~halve VRAM and speed up the GPU forward; negligible
+        # quality loss for inference (the GPU upcasts internally as needed).
         _models[model_name] = SentenceTransformer(
-            model_name, model_kwargs={"use_safetensors": True}
+            model_name,
+            model_kwargs={"use_safetensors": True, "torch_dtype": "float16"},
         )
     return _models[model_name]
 
