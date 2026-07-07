@@ -74,7 +74,9 @@ def run(config: EvalConfig) -> dict:
         if not gold_pages:  # document not in the indexed corpus
             skipped += 1
             continue
-        results = retriever.retrieve(qa.question, k=top_k)
+        results = retriever.retrieve(
+            qa.question, k=top_k, doc_id=qa.doc_name if config.doc_scoped else None
+        )
         relevances = _dedup_relevances(results, qa.doc_name, gold_pages)
         per_qa.append(_score_qa(relevances, len(gold_pages), config.k_values))
 
@@ -84,6 +86,7 @@ def run(config: EvalConfig) -> dict:
         "collection": config.collection_name,
         "embedding_model": config.embedding_model,
         "retriever": config.retriever,
+        "doc_scoped": config.doc_scoped,
         "n_evaluated": len(per_qa),
         "n_skipped_doc_absent": skipped,
         "metrics": metrics,
