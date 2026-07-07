@@ -1,10 +1,16 @@
 # Index stage: embed docling/hybrid chunks into a Qdrant collection.
 # make index CONFIG=configs/index_docling_hybrid.yaml
 
-chunks_path: data/processed/docling_hybrid/chunks.jsonl
-collection_name: docling_hybrid_bge-m3
+chunks_path: data/processed/docling/chunked/hybrid/chunks_256.jsonl
+collection_name: docling_hybrid_256_bge-m3
 embed_batch_size: 128   # short chunks + fp16 weights leave VRAM headroom; raise to 256 if it fits
 upsert_batch_size: 128
 embedding_model: BAAI/bge-m3          # default; override to compare embedders
 #qdrant_location: http://localhost:6333   # default; QDRANT_URL env or http://localhost:6333)
-recreate: true    # false = resume (skip already-indexed); true = fresh (drop + reindex all)
+recreate: false    # false = resume (skip already-indexed); true = fresh (drop + reindex all)
+
+
+
+# for 512 collection_name: docling_hybrid_bge-m3
+# for 256 collection_name: docling_hybrid_256_bge-m3
+# for 1024 collection_name: docling_hybrid_1024_bge-m3

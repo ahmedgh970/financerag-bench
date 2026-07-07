@@ -22,6 +22,7 @@ class EvalConfig(BaseModel):
     collection_name: str
     embedding_model: str = "BAAI/bge-m3"
     retriever: str = "dense"
+    doc_scoped: bool = False  # True: restrict retrieval to each QA's gold document
     qdrant_location: str = Field(
         default_factory=lambda: os.getenv("QDRANT_URL", "http://localhost:6333")
     )

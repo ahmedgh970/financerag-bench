@@ -1,2 +1,3 @@
-chunks_path: data/processed/docling_hybrid/chunks.jsonl
+chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
 collection_name: docling_hybrid_bge-m3
+doc_scoped: true   # restrict retrieval to each QA gold document
