@@ -4,17 +4,17 @@ Reads the chunks produced by the ingestion stage, embeds them and upserts them
 into a Qdrant collection sized for the chosen embedding model.
 
 Usage:
-    python -m src.retrieval.index_runner --config configs/index_docling_hybrid.yaml
+    python -m src.indexing.runner --config configs/index_docling_hybrid.yaml
 """
 
 from __future__ import annotations
 
 import argparse
 
+from src.indexing.config import IndexConfig, load_index_config
 from src.ingestion.storage import read_chunks
-from src.retrieval.config import IndexConfig, load_index_config
-from src.retrieval.embeddings import embedding_dim
-from src.retrieval.qdrant_store import create_collection, get_client, upsert_chunks
+from src.vectorstore.embeddings import embedding_dim
+from src.vectorstore.qdrant_store import create_collection, get_client, upsert_chunks
 
 
 def run(config: IndexConfig) -> str:

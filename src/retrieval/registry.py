@@ -15,7 +15,7 @@ from src.retrieval.base import Retriever
 
 def _build_dense(cfg) -> Retriever:
     from src.retrieval.dense import DenseRetriever
-    from src.retrieval.qdrant_store import get_client
+    from src.vectorstore.qdrant_store import get_client
 
     return DenseRetriever(
         client=get_client(cfg.qdrant_location),
