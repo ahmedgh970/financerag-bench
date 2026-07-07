@@ -8,6 +8,7 @@ with its similarity score.
 from __future__ import annotations
 
 from qdrant_client import QdrantClient
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 from src.retrieval.base import ScoredChunk
 from src.retrieval.embeddings import embed_texts
@@ -26,7 +27,14 @@ class DenseRetriever:
         self.collection_name = collection_name
         self.model_name = model_name
 
-    def retrieve(self, query: str, k: int = 5) -> list[ScoredChunk]:
+    def retrieve(self, query: str, k: int = 5, doc_id: str | None = None) -> list[ScoredChunk]:
         vector = embed_texts([query], model_name=self.model_name)[0].tolist()
-        hits = self.client.query_points(self.collection_name, query=vector, limit=k).points
+        query_filter = (
+            Filter(must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))])
+            if doc_id
+            else None
+        )
+        hits = self.client.query_points(
+            self.collection_name, query=vector, limit=k, query_filter=query_filter
+        ).points
         return [ScoredChunk(chunk=chunk_from_payload(h.payload), score=h.score) for h in hits]

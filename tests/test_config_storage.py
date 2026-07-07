@@ -18,8 +18,15 @@ def test_load_config_from_yaml(tmp_path):
 
 
 def test_resolved_output_path_default():
+    # No token budget -> no suffix.
     cfg = IngestConfig(parser="docling", chunker="hybrid")
-    assert cfg.resolved_output_path == "data/processed/docling_hybrid/chunks.jsonl"
+    assert cfg.resolved_output_path == "data/processed/docling/chunked/hybrid/chunks.jsonl"
+
+
+def test_resolved_output_path_token_budget_suffix():
+    # max_tokens becomes a filename suffix so ablation sizes land in separate files.
+    cfg = IngestConfig(parser="docling", chunker="hybrid", chunker_params={"max_tokens": 512})
+    assert cfg.resolved_output_path == "data/processed/docling/chunked/hybrid/chunks_512.jsonl"
 
 
 def test_resolved_output_path_explicit():
