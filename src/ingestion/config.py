@@ -31,8 +31,13 @@ class IngestConfig(BaseModel):
 
     @property
     def resolved_output_path(self) -> str:
-        """Where chunks are written; derived from parser+chunker if unset."""
-        return self.output_path or f"{self.processed_dir}/{self.parser}_{self.chunker}/chunks.jsonl"
+        """Where chunks are written; derived from parser/chunker (+token budget) if unset."""
+        budget = self.chunker_params.get("max_tokens")
+        suffix = f"_{budget}" if budget else ""
+        return (
+            self.output_path
+            or f"{self.processed_dir}/{self.parser}/chunked/{self.chunker}/chunks{suffix}.jsonl"
+        )
 
 
 def load_config(path: str) -> IngestConfig:
