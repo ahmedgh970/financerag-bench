@@ -43,10 +43,25 @@ def _build_hybrid(cfg) -> Retriever:
     return HybridRetriever(dense=_build_dense(cfg), sparse=BM25Retriever(_load_corpus(cfg)))
 
 
+def _build_reranked(cfg) -> Retriever:
+    from src.retrieval.reranked import RerankedRetriever
+    from src.retrieval.reranker import Reranker
+
+    if not cfg.base_retriever:
+        raise ValueError("retriever 'reranked' requires 'base_retriever' to be set")
+    base = build_retriever(cfg.base_retriever, cfg)
+    return RerankedRetriever(
+        base=base,
+        reranker=Reranker(cfg.reranker_model),
+        prefetch=cfg.rerank_prefetch,
+    )
+
+
 _BUILDERS: dict[str, Callable[[object], Retriever]] = {
     "dense": _build_dense,
     "bm25": _build_bm25,
     "hybrid": _build_hybrid,
+    "reranked": _build_reranked,
 }
 
 

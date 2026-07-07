@@ -28,6 +28,11 @@ class EvalConfig(BaseModel):
     )
     k_values: list[int] = [1, 3, 5, 10]
 
+    # Only used when retriever == "reranked".
+    base_retriever: str | None = None  # dense | bm25 | hybrid, reranked on top of
+    reranker_model: str = "BAAI/bge-reranker-v2-m3"
+    rerank_prefetch: int = 50  # candidates pulled from base_retriever before rerank
+
 
 def load_eval_config(path: str) -> EvalConfig:
     """Load and validate an evaluation config from a YAML file."""
