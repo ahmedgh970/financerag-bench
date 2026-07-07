@@ -24,8 +24,29 @@ def _build_dense(cfg) -> Retriever:
     )
 
 
+def _load_corpus(cfg) -> list:
+    from src.ingestion.storage import read_chunks
+
+    return list(read_chunks(cfg.chunks_path))
+
+
+def _build_bm25(cfg) -> Retriever:
+    from src.retrieval.bm25 import BM25Retriever
+
+    return BM25Retriever(_load_corpus(cfg))
+
+
+def _build_hybrid(cfg) -> Retriever:
+    from src.retrieval.bm25 import BM25Retriever
+    from src.retrieval.hybrid import HybridRetriever
+
+    return HybridRetriever(dense=_build_dense(cfg), sparse=BM25Retriever(_load_corpus(cfg)))
+
+
 _BUILDERS: dict[str, Callable[[object], Retriever]] = {
     "dense": _build_dense,
+    "bm25": _build_bm25,
+    "hybrid": _build_hybrid,
 }
 
 
