@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from src.retrieval.qdrant_store import get_client
+from src.vectorstore.qdrant_store import get_client
 
 
 def test_memory_connection():

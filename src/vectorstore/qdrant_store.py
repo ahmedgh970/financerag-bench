@@ -15,7 +15,7 @@ from qdrant_client.models import Distance, PointStruct, VectorParams
 from tqdm import tqdm
 
 from src.ingestion.schema import Chunk
-from src.retrieval.embeddings import embed_texts
+from src.vectorstore.embeddings import embed_texts
 
 
 def get_client(location: str) -> QdrantClient:

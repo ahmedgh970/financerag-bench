@@ -6,7 +6,7 @@ computes recall@k / precision@k / MRR / nDCG@k. Results are averaged over the QA
 whose document is present in the indexed corpus and saved to ``benchmarks/``.
 
 Usage:
-    python -m src.evaluation.runner --config configs/eval_docling_hybrid.yaml
+    python -m src.evaluation.runner --config configs/eval_hybrid512_dense.yaml
 """
 
 from __future__ import annotations

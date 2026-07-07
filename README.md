@@ -43,11 +43,11 @@ docker compose up -d
 make install-all
 
 # 3. Parse + chunk documents
-make parse CONFIG=configs/parse_docling.yaml
-make chunk CONFIG=configs/chunk_docling_hybrid.yaml
+make parse CONFIG=configs/parse/docling.yaml
+make chunk CONFIG=configs/chunk/docling_hybrid.yaml
 
 # 4. Run evaluation
-make eval CONFIG=configs/baseline.yaml
+make eval CONFIG=configs/eval/hybrid512_dense.yaml
 ```
 
 ---
@@ -58,7 +58,11 @@ make eval CONFIG=configs/baseline.yaml
 financerag-bench/
 ├── README.md
 ├── docs/                          # ADRs, benchmark reports
-├── configs/                       # 1 YAML = 1 reproducible experiment
+├── configs/                       # 1 YAML = 1 reproducible experiment, grouped by stage
+│   ├── parse/
+│   ├── chunk/
+│   ├── index/
+│   └── eval/
 ├── data/
 │   ├── pdfs/                      # 368 docs
 │   ├── jsons/                     # 150 QA pairs (FinanceBench open-source)
