@@ -22,6 +22,10 @@ class ScoredChunk:
 
 
 class Retriever(Protocol):
-    """Anything that returns the top-k chunks for a query."""
+    """Anything that returns the top-k chunks for a query.
 
-    def retrieve(self, query: str, k: int = 5) -> list[ScoredChunk]: ...
+    ``doc_id`` optionally restricts the search to a single document (FinanceBench
+    questions target a known filing); ``None`` searches the whole collection.
+    """
+
+    def retrieve(self, query: str, k: int = 5, doc_id: str | None = None) -> list[ScoredChunk]: ...
