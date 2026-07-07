@@ -11,8 +11,8 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 
 from src.retrieval.base import ScoredChunk
-from src.retrieval.embeddings import embed_texts
-from src.retrieval.qdrant_store import chunk_from_payload
+from src.vectorstore.embeddings import embed_texts
+from src.vectorstore.qdrant_store import chunk_from_payload
 
 
 class DenseRetriever:

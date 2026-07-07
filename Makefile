@@ -1,7 +1,7 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index eval benchmark serve docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index eval serve docker-up docker-down clean
 
 PYTHON := python
-CONFIG ?= configs/baseline.yaml
+CONFIG ?= configs/eval/hybrid512_dense.yaml
 
 help:
 	@echo "financerag-bench — available commands:"
@@ -16,7 +16,6 @@ help:
 	@echo "  make chunk          Chunk parsed docs -> chunks.jsonl (CONFIG=...)"
 	@echo "  make index          Embed chunks.jsonl -> Qdrant collection (CONFIG=...)"
 	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
-	@echo "  make benchmark      Run full benchmark suite"
 	@echo "  make serve          Start FastAPI server"
 	@echo "  make docker-up      Start Docker services (Qdrant, Langfuse)"
 	@echo "  make docker-down    Stop Docker services"
@@ -43,19 +42,16 @@ test-fast:
 	uv run --extra dev pytest tests/ -v -m "not slow and not eval"
 
 parse:
-	uv run --extra ingestion python -m src.ingestion.run parse --config $(CONFIG)
+	uv run --extra ingestion python -m src.ingestion.runner parse --config $(CONFIG)
 
 chunk:
-	uv run --extra ingestion python -m src.ingestion.run chunk --config $(CONFIG)
+	uv run --extra ingestion python -m src.ingestion.runner chunk --config $(CONFIG)
 
 index:
-	uv run python -m src.retrieval.index_runner --config $(CONFIG)
+	uv run python -m src.indexing.runner --config $(CONFIG)
 
 eval:
 	uv run python -m src.evaluation.runner --config $(CONFIG)
-
-benchmark:
-	uv run python -m src.evaluation.runner --config configs/full_benchmark.yaml
 
 serve:
 	uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000

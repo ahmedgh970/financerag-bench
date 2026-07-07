@@ -1,3 +1,5 @@
+# Eval: BM25 alone, docling-hybrid-512 corpus, doc-scoped.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
 collection_name: docling_hybrid_bge-m3
-doc_scoped: true   # restrict retrieval to each QA gold document
+retriever: bm25
+doc_scoped: true
