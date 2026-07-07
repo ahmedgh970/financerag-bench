@@ -5,8 +5,8 @@ Parsing is the expensive stage, done once per parser and persisted to
 re-parsing, so several chunkers can be compared from a single parse.
 
 Usage:
-    python -m src.ingestion.run parse --config configs/parse_docling.yaml
-    python -m src.ingestion.run chunk --config configs/chunk_docling_hybrid.yaml
+    python -m src.ingestion.runner parse --config configs/parse_docling.yaml
+    python -m src.ingestion.runner chunk --config configs/chunk_docling_hybrid.yaml
 """
 
 from __future__ import annotations
