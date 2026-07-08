@@ -1,4 +1,4 @@
-# ADR 0001 — Stratégie de retrieval : dense vs BM25 vs hybride RRF
+# ADR 0001 — Stratégie de retrieval : dense vs BM25 vs hybride RRF vs reranker
 
 ## Statut
 
@@ -29,6 +29,10 @@ lexical entre l'evidence et le corpus, dédupliquée par page).
 1. **Dense** — BGE-M3 + Qdrant (similarité cosinus).
 2. **BM25** — lexical pur (`rank-bm25`), IDF calculé sur tout le corpus.
 3. **Hybride** — fusion dense + BM25 par Reciprocal Rank Fusion (RRF).
+4. **Reranker** — cross-encoder (`BAAI/bge-reranker-v2-m3`) qui re-score un
+   shortlist (`prefetch=50`) issu de n'importe lequel des trois retrievers
+   ci-dessus, par attention croisée query↔chunk (impossible pour un
+   bi-encoder, qui embarque les deux textes indépendamment).
 
 ## Résultats
 
@@ -42,6 +46,9 @@ Toutes les lignes ci-dessous évaluent les 150 QA (0 skip), corpus
 | P2 | bm25 | doc-scoped | 0.113 | 0.176 | 0.222 | 0.261 | 0.160 | 0.183 |
 | P2 | hybride RRF (naïf : pf=100, poids égaux) | doc-scoped | 0.166 | 0.229 | 0.252 | 0.340 | 0.223 | 0.247 |
 | P2 | hybride RRF (réglé : pf=20, w_bm25=0.3) | doc-scoped | 0.173 | 0.286 | 0.361 | 0.556 | 0.288 | 0.343 |
+| P3 | **reranked(dense)** (prefetch=50) | doc-scoped | **0.290** | **0.466** | **0.549** | **0.649** | **0.433** | **0.473** |
+| P3 | reranked(bm25) (prefetch=50) | doc-scoped | 0.199 | 0.252 | 0.272 | 0.320 | 0.242 | 0.256 |
+| P3 | reranked(hybrid) (prefetch=50) | doc-scoped | 0.290 | 0.466 | 0.549 | 0.649 | 0.433 | 0.473 |
 
 Balayage complémentaire (rankings dense/BM25 collectés une fois, fusion
 recalculée en mémoire, profondeur de pool `pf` × poids BM25 `w_bm25`,
@@ -78,14 +85,70 @@ réduit à 0.3) permet de retrouver le niveau du dense, mais sans le dépasser
 significativement (0.556 vs 0.552, soit +0.4 point — dans le bruit) — et reste
 **inférieur** au dense seul sur recall@1, recall@3, recall@5, MRR et nDCG@10.
 
+**Le reranker apporte le premier gain net et large sur toutes les métriques.**
+`reranked(dense)` passe le recall@10 de 0.552 à 0.649 (+0.097), mais le gain le
+plus net est sur les rangs précoces et le classement : recall@1 +0.063,
+recall@3 +0.134, recall@5 +0.147, MRR +0.095, nDCG@10 +0.096. Contrairement au
+RRF, qui ne fait que réordonner deux classements approximatifs par rang, le
+cross-encoder évalue chaque paire (question, chunk) avec attention croisée —
+il corrige des erreurs de classement que le bi-encoder ne peut pas voir (ex.
+remonter en tête un chunk contenant le bon chiffre dans un tableau, que
+l'embedding avait sous-classé). C'est cohérent avec l'hypothèse de ce document :
+le recall@10 modeste du dense seul venait davantage d'un problème de
+**classement fin** que d'un problème de couverture (le bon chunk était souvent
+récupéré, juste mal classé).
+
+**Le reranker améliore aussi BM25, mais ne peut pas compenser un premier étage
+faible.** `reranked(bm25)` gagne sur toutes les métriques par rapport à BM25
+seul (recall@10 0.261 → 0.320, MRR 0.160 → 0.242, nDCG@10 0.183 → 0.256) — un
+schéma de gain similaire à `reranked(dense)`. Mais son niveau absolu
+(recall@10 = 0.320) reste très en dessous de `reranked(dense)` (0.649) : le
+reranker ne re-score que les `prefetch=50` candidats déjà remontés par la
+première étape, donc son recall est plafonné par le recall@50 du retriever de
+base. Si le bon chunk n'est pas dans le top-50 de BM25, aucun reranking ne
+peut le rattraper. Ça confirme que **la qualité du premier étage reste
+déterminante** : le reranker amplifie un bon retriever, il ne corrige pas un
+retriever faible.
+
+**`reranked(hybrid)` est numériquement identique à `reranked(dense)`** (mêmes
+métriques à la 4e décimale, run reproduit deux fois). Ce n'est pas une
+coïncidence ni un bug : c'est une conséquence directe des poids RRF réglés en
+P2. Avec `dense_weight=1.0`, `sparse_weight=0.3`, `rrf_k=60` et une profondeur
+de prefetch de 50, le pire score qu'un chunk du dense peut obtenir (rang 50)
+est `1.0/(60+50) ≈ 0.00909`, strictement supérieur au meilleur score qu'un
+chunk **exclusif à BM25** peut obtenir (rang 1) : `0.3/(60+1) ≈ 0.00492`. Aucun
+chunk propre à BM25 ne peut donc jamais entrer dans le top-50 fusionné — la
+fusion ne fait que réordonner les 50 chunks du dense. Vérifié par le code :
+pour un échantillon de requêtes, l'ensemble des 50 candidats fusionnés est
+strictement identique à l'ensemble des 50 candidats du dense seul, seul
+l'ordre interne diffère. Or `RerankedRetriever` ignore l'ordre reçu de son
+retriever de base (il re-score chaque candidat indépendamment avec le
+cross-encoder puis retrie) : le reranking final ne peut donc produire qu'un
+résultat identique, quel que soit le mélange interne du RRF en amont.
+
+Ce résultat est en réalité informatif : il montre que **BM25 est totalement
+neutralisé** par ce réglage de poids tant que la profondeur de prefetch reste
+sous le seuil `n < (w_dense/w_sparse)·(rrf_k+1) − rrf_k` (≈ 143 chunks ici,
+n=50 y est largement inférieur), ce qui confirme, par une preuve structurelle
+et non plus seulement empirique, que l'hybride n'ajoute rien tant que sa
+composante dense reste dominante à cette profondeur.
+
 ## Décision
 
-**Le retriever dense (BGE-M3) reste la référence** du pipeline. BM25 et
-l'hybride RRF sont implémentés, testés et enregistrés dans le registry
-(`bm25`, `hybrid`) — utilisables pour des ablations futures ou sur un corpus
-où le signal lexical (tickers, codes exacts) compterait davantage — mais ne
-sont pas adoptés par défaut : ils n'apportent aucun gain mesurable ici et
-dégradent certaines métriques.
+**Le pipeline par défaut devient dense + reranker cross-encoder**
+(`reranked(dense)`), qui domine toutes les métriques mesurées (recall@10 =
+0.649, MRR = 0.433, nDCG@10 = 0.473). `reranked(hybrid)` obtient exactement le
+même résultat (cf. analyse) sans aucun bénéfice ni coût réel puisque BM25 y
+est neutralisé — il n'y a donc pas lieu de le préférer à `reranked(dense)`,
+plus simple (un seul retriever à charger et interroger). BM25 et l'hybride RRF
+restent implémentés, testés et enregistrés dans le registry (`bm25`,
+`hybrid`) — réutilisables pour un corpus où le signal lexical (tickers, codes
+exacts) compterait davantage, ou avec des poids/profondeur différents — mais
+ne sont pas adoptés par défaut : sans reranking, ils n'apportent aucun gain
+mesurable et dégradent certaines métriques ; avec reranking, l'hybride n'a
+d'effet que s'il est réglé pour laisser BM25 réellement peser dans le pool de
+candidats (poids plus élevé et/ou prefetch plus profond que la configuration
+actuelle) — non testé ici.
 
 ## Conséquences
 
@@ -96,6 +159,14 @@ dégradent certaines métriques.
   (`dense_weight`, `sparse_weight`) plutôt qu'un RRF à poids égaux — le
   réglage par défaut (`prefetch=20`, `sparse_weight=0.3`) correspond au
   meilleur point trouvé lors du balayage.
-- Le recall@10 absolu du dense (0.552) reste modeste : la piste retenue pour
-  la suite est un **reranker cross-encoder** appliqué sur le top-k du dense,
-  plutôt qu'un retriever lexical supplémentaire.
+- Un retriever `reranked` est enregistré dans le registry : il enveloppe
+  n'importe quel `base_retriever` (`dense`/`bm25`/`hybrid`) avec un
+  `Reranker` cross-encoder (`reranker_model`, `rerank_prefetch`), sans
+  modification de l'harnais d'évaluation.
+- Reste à mesurer : l'effet du reranking combiné à l'ablation de taille de
+  chunk (256/512/1024), et — si on veut vraiment évaluer l'apport de BM25 sous
+  reranking — un hybride avec un `sparse_weight` et/ou un `prefetch` plus
+  élevés que la configuration actuelle (`sparse_weight=0.3`, `prefetch=20`),
+  seule façon de laisser des chunks exclusifs à BM25 atteindre le pool
+  re-scoré par le reranker.
+-
