@@ -1,0 +1,9 @@
+# RAG naïf : reranked(dense) -> LiteLLM (Groq Llama 3.3 70B).
+chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
+collection_name: docling_hybrid_bge-m3
+retriever: reranked
+base_retriever: dense
+doc_scoped: true
+k: 10
+llm:
+  model: groq/llama-3.3-70b-versatile
