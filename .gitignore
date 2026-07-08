@@ -1,5 +1,7 @@
 # Learning docs
 docs/*.md
+docs/checklists
+CLAUDE.md
 
 # Project-specific
 .env
