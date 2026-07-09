@@ -32,8 +32,12 @@ _TRANSIENT_ERRORS = (
 
 @retry(
     retry=retry_if_exception_type(_TRANSIENT_ERRORS),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
+    # Free-tier rate limits (e.g. Groq's tokens-per-minute cap) reset on a
+    # ~60s rolling window, not in a couple seconds — a short backoff just
+    # burns through attempts and still fails. Wait long enough for that
+    # window to clear, and allow enough attempts to actually get through it.
+    stop=stop_after_attempt(6),
+    wait=wait_exponential(multiplier=2, min=5, max=60),
 )
 def generate(prompt: str, config: LLMConfig) -> str:
     """Generate a completion for ``prompt`` using ``config``."""
