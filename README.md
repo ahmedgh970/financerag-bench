@@ -21,19 +21,22 @@ FinanceBench shows that state-of-the-art RAG systems fail on ~80% of financial q
 
 ## Results
 
-*To be filled — Week 3+*
+Retrieval quality on the 150 FinanceBench QA, doc-scoped (each question
+restricted to its source filing — see [ADR 0001](docs/adr/0001-retrieval-strategy.md)
+for the full comparison including BM25 and hybrid fusion):
 
-| Pipeline | Recall@5 | Accuracy (LLM judge) | Latency p50 |
-|---|---|---|---|
-| Naive RAG (baseline) | - | - | - |
-| Hybrid + Reranker | - | - | - |
-| Agentic RAG | - | - | - |
+| Configuration | recall@5 | recall@10 | MRR | nDCG@10 |
+|---|---|---|---|---|
+| Dense (global, no doc filter) | 0.230 | 0.297 | 0.182 | 0.205 |
+| Dense (doc-scoped) | 0.402 | 0.552 | 0.338 | 0.377 |
+| **Dense + cross-encoder reranker** (default) | **0.549** | **0.649** | **0.433** | **0.473** |
+
+End-to-end generation quality (LLM-judged answer accuracy, faithfulness) is
+the next milestone — results to follow.
 
 ---
 
 ## Quickstart
-
-*To be filled — Week 4*
 
 ```bash
 # 1. Start services
@@ -68,7 +71,9 @@ financerag-bench/
 │   ├── jsons/                     # 150 QA pairs (FinanceBench open-source)
 │   └── processed/                 # chunks, embeddings
 ├── src/
-│   ├── ingestion/                 # PDF parsing, chunking strategies
+│   ├── ingestion/                 # PDF parsing (Docling, Unstructured), chunking strategies
+│   ├── vectorstore/               # embeddings + Qdrant client, shared by indexing and retrieval
+│   ├── indexing/                  # offline job: chunks -> embeddings -> Qdrant
 │   ├── retrieval/                 # dense, BM25, hybrid, reranker
 │   ├── llm/                       # LiteLLM client + versioned prompts
 │   ├── rag/                       # pipelines: naive → advanced → agentic
@@ -78,9 +83,9 @@ financerag-bench/
 ├── benchmarks/                    # results (JSON/CSV) versioned
 ├── dashboard/                     # Streamlit benchmark explorer
 ├── tests/                         # pytest (unit + integration + eval regression)
-├── .github/workflows/             # CI: lint, tests, smoke eval
+├── .github/workflows/             # CI: lint, format check, fast tests
 ├── docker-compose.yml             # Qdrant + Langfuse
-└── Makefile                       # make ingest / eval / benchmark / serve
+└── Makefile                       # make parse / chunk / index / eval / answer / serve
 ```
 
 ---
@@ -95,7 +100,7 @@ financerag-bench/
 | Vector DB | Qdrant |
 | Lexical search | BM25 |
 | Reranking | cross-encoder (BAAI/bge-reranker) |
-| PDF parsing | Docling + PyMuPDF |
+| PDF parsing | Docling + Unstructured |
 | Embeddings | BGE-M3 |
 | Evaluation | Ragas + custom retrieval metrics |
 | Observability | Langfuse |
