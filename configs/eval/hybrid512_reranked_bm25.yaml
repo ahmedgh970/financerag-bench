@@ -1,6 +1,6 @@
 # Eval: BM25 retriever reranked by a cross-encoder, docling-hybrid-512 corpus, doc-scoped.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
-collection_name: docling_hybrid_bge-m3
+collection_name: docling_hybrid_512_bge-m3
 retriever: reranked
 base_retriever: bm25
 reranker_model: BAAI/bge-reranker-v2-m3

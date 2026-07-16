@@ -11,6 +11,6 @@ recreate: false    # false = resume (skip already-indexed); true = fresh (drop +
 
 
 
-# for 512 collection_name: docling_hybrid_bge-m3
+# for 512 collection_name: docling_hybrid_512_bge-m3
 # for 256 collection_name: docling_hybrid_256_bge-m3
 # for 1024 collection_name: docling_hybrid_1024_bge-m3
