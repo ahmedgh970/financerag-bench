@@ -1,0 +1,9 @@
+# Chunk stage: Docling hybrid, 512-token budget (reads data/processed/docling/parsed/).
+# make chunk CONFIG=configs/chunk/docling_hybrid_512.yaml
+
+parser: docling
+chunker: hybrid
+chunker_params:
+  max_tokens: 512              # token budget per chunk (ablation: 256 / 512 / 1024)
+  tokenizer_model: BAAI/bge-m3 # count the budget in the embedder's tokenizer
+output_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
