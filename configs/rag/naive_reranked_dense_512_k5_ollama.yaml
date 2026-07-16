@@ -1,0 +1,9 @@
+# RAG naïf : reranked(dense) -> Ollama Llama 3.1 8B — sans quota, local.
+chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
+collection_name: docling_hybrid_512_bge-m3
+retriever: reranked
+base_retriever: dense
+doc_scoped: true
+k: 5
+llm:
+  model: ollama_chat/llama3.1:8b
