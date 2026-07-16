@@ -33,6 +33,8 @@ lexical entre l'evidence et le corpus, dédupliquée par page).
    shortlist (`prefetch=50`) issu de n'importe lequel des trois retrievers
    ci-dessus, par attention croisée query↔chunk (impossible pour un
    bi-encoder, qui embarque les deux textes indépendamment).
+5. **Taille de chunk** — budget du `HybridChunker` (tokenizer BGE-M3) :
+   256 / 512 / 1024 tokens, corpus et collection Qdrant séparés par taille.
 
 ## Résultats
 
@@ -150,6 +152,61 @@ d'effet que s'il est réglé pour laisser BM25 réellement peser dans le pool de
 candidats (poids plus élevé et/ou prefetch plus profond que la configuration
 actuelle) — non testé ici.
 
+## Étude de cas : taille de chunk et classement (avant l'ablation complète)
+
+**Statut : illustratif, pas encore statistique.** L'ablation 256/512/1024 sur
+les 150 QA n'est pas terminée (indexation encore en cours au moment de cette
+note). Avant de la lancer, un cas a été creusé en détail pour comprendre le
+*mécanisme* par lequel la taille de chunk influence le retrieval — sur la
+question `financebench_id_04672` (« year end FY2018 net PPNE for 3M »,
+gold = `$8.70`B, corpus `3M_2018_10K`, evidence = le bilan comptable
+consolidé, page FinanceBench 57).
+
+**À 512 tokens**, la page du bilan est coupée par le `HybridChunker` en 3
+chunks structurellement distincts : actifs (`::216`, contient la ligne
+`Property, plant and equipment -net, 2018 = 8,738` — la réponse), passifs
+(`::217`), capitaux propres (`::218`). Seul `::217` (passifs, sans la
+réponse) apparaît dans le top-10 de `reranked(dense)` ; `::216` (avec la
+réponse) est classé **19ᵉ en dense, 13ᵉ après reranking** sur les 100
+candidats du document — hors de portée à k=5 et k=10. Conséquence
+observée en génération : à k=5 et k=10, le modèle (Llama 3.3 70B) refuse
+honnêtement de répondre (« the context does not contain the answer »)
+plutôt que d'halluciner un chiffre — comportement voulu par le prompt (G2),
+mais qui traduit ici une vraie lacune de retrieval, pas de génération.
+
+**À 1024 tokens**, les sections actifs+passifs fusionnent en un seul chunk
+(`::157`) qui contient toujours la ligne `8,738`. Comparé au texte gold
+(overlap de mots et de chiffres, même méthode que `matching.py`) : 74,5 %
+des mots et 81 % des chiffres du gold sont couverts ; les 19 % de chiffres
+manquants appartiennent tous à la section **Equity**, qui ne tient toujours
+pas dans le budget de 1024 tokens (le chunk s'arrête net en plein milieu).
+Le classement du chunk fusionné progresse nettement : **10ᵉ en dense (19ᵉ
+à 512), 7ᵉ après reranking (13ᵉ à 512)** — mais reste hors de k=5, donc
+cette question précise échouerait encore avec le réglage `k=5` actuellement
+utilisé pour tenir dans les quotas Groq. Effet secondaire noté : à 1024
+tokens, le chiffre `8,738` apparaît aussi, redondamment, dans 3 autres
+chunks du même filing (tableaux annexes « Geographic Areas », pages 39,
+81, 127) — davantage de points d'entrée possibles dans le corpus pour la
+même information, contre un seul à 512.
+
+**Interprétation.** Le gain vient de la **concentration du signal** : un
+chunk de 512 tokens qui isole une portion d'un tableau financier (ici,
+uniquement les actifs) dilue moins son embedding *individuellement*, mais
+fragmente l'information nécessaire à répondre — le retriever doit alors
+retrouver le bon **sous-chunk** parmi plusieurs candidats structurellement
+proches (même page, même document), ce qui est plus difficile que de
+retrouver un chunk plus large qui contient d'emblée toute l'information
+utile. 1024 tokens ne résout pas tout (la section Equity déborde encore),
+mais réduit la fragmentation sur les tableaux de taille moyenne comme ce
+bilan.
+
+**Limite de cette étude de cas.** Un seul exemple, aussi net soit-il, ne
+permet pas de conclure pour les 150 QA — d'autres questions pourraient ne
+pas bénéficier de la fusion (contenu déjà compact à 512, ou tableaux plus
+grands que même 1024 ne peut réunir), voire en pâtir (dilution accrue sur
+des passages qui, eux, gagnaient à rester petits). Ce cas motive
+l'hypothèse testée par l'ablation ; il ne la remplace pas.
+
 ## Conséquences
 
 - L'harnais d'évaluation gagne un flag `doc_scoped` (`EvalConfig`) ; toute
@@ -163,10 +220,14 @@ actuelle) — non testé ici.
   n'importe quel `base_retriever` (`dense`/`bm25`/`hybrid`) avec un
   `Reranker` cross-encoder (`reranker_model`, `rerank_prefetch`), sans
   modification de l'harnais d'évaluation.
-- Reste à mesurer : l'effet du reranking combiné à l'ablation de taille de
-  chunk (256/512/1024), et — si on veut vraiment évaluer l'apport de BM25 sous
-  reranking — un hybride avec un `sparse_weight` et/ou un `prefetch` plus
-  élevés que la configuration actuelle (`sparse_weight=0.3`, `prefetch=20`),
-  seule façon de laisser des chunks exclusifs à BM25 atteindre le pool
-  re-scoré par le reranker.
--
+- **Aucun changement de défaut décidé sur la taille de chunk** : le corpus
+  de référence reste `docling_hybrid_bge-m3` (512 tokens) tant que
+  l'ablation complète (256/512/1024 × 150 QA) n'a pas confirmé, à
+  l'échelle du benchmark, la tendance observée sur ce cas isolé.
+- Reste à mesurer : l'ablation 256/512/1024 sur les 150 QA une fois les
+  index terminés (`docling_hybrid_256_bge-m3`, `docling_hybrid_1024_bge-m3`),
+  et — si on veut vraiment évaluer l'apport de BM25 sous reranking — un
+  hybride avec un `sparse_weight` et/ou un `prefetch` plus élevés que la
+  configuration actuelle (`sparse_weight=0.3`, `prefetch=20`), seule façon
+  de laisser des chunks exclusifs à BM25 atteindre le pool re-scoré par
+  le reranker.
