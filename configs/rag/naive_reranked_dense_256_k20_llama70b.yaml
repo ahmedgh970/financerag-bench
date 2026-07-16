@@ -1,0 +1,8 @@
+chunks_path: data/processed/docling/chunked/hybrid/chunks_256.jsonl
+collection_name: docling_hybrid_256_bge-m3
+retriever: reranked
+base_retriever: dense
+doc_scoped: true
+k: 20
+llm:
+  model: groq/llama-3.3-70b-versatile
