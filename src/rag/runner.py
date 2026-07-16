@@ -45,13 +45,19 @@ def _select(qas: list[QAItem], qa_id: str | None) -> list[QAItem]:
 
 
 def _output_path(config: RagConfig) -> Path:
-    """Where answers are written: one file per (retriever, LLM, k) combination.
+    """Where answers are written: one file per (retriever, corpus, LLM, k) combination.
 
-    Encoding the model and k avoids silently mixing answers generated under
-    different settings when comparing LLMs/retrievers (Semaine 6).
+    The corpus is identified by ``collection_name`` (one Qdrant collection = one
+    indexed corpus, e.g. a chunk-size ablation). Encoding it alongside the model
+    and k keeps answers from different settings in separate files — critical with
+    the resume logic below, which would otherwise count one corpus's answers as
+    another's and silently skip them.
     """
     model = config.llm.model.replace("/", "_")
-    return Path("data/processed/answers") / f"{config.retriever}_{model}_k{config.k}.jsonl"
+    return (
+        Path("data/processed/answers")
+        / f"{config.retriever}_{config.collection_name}_{model}_k{config.k}.jsonl"
+    )
 
 
 def run(config: RagConfig, qa_id: str | None = None) -> str:
