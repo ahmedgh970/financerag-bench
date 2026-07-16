@@ -44,7 +44,7 @@ make install-all
 
 # 3. Parse + chunk documents
 make parse CONFIG=configs/parse/docling.yaml
-make chunk CONFIG=configs/chunk/docling_hybrid.yaml
+make chunk CONFIG=configs/chunk/docling_hybrid_512.yaml
 
 # 4. Run evaluation
 make eval CONFIG=configs/eval/hybrid512_dense.yaml
