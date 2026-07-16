@@ -8,6 +8,7 @@ mid-run doesn't lose progress — rerun the same command later to continue.
 
 Usage:
     python -m src.rag.runner --config configs/rag/naive_reranked_dense.yaml
+    python -m src.rag.runner --config configs/rag/naive_reranked_dense.yaml --id financebench_id_03029
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from pathlib import Path
 from tqdm import tqdm
 
 from src.evaluation.golden_set import load_golden_set
+from src.evaluation.schema import QAItem
 from src.rag.config import RagConfig, load_rag_config
 from src.rag.naive import answer
 from src.retrieval.registry import build_retriever
@@ -32,6 +34,16 @@ def _answered_ids(path: Path) -> set[str]:
         return {json.loads(line)["id"] for line in f if line.strip()}
 
 
+def _select(qas: list[QAItem], qa_id: str | None) -> list[QAItem]:
+    """All QA, or just the one matching ``qa_id`` (for quick single-question checks)."""
+    if qa_id is None:
+        return qas
+    selected = [qa for qa in qas if qa.id == qa_id]
+    if not selected:
+        raise SystemExit(f"No QA with id {qa_id!r} in the golden set.")
+    return selected
+
+
 def _output_path(config: RagConfig) -> Path:
     """Where answers are written: one file per (retriever, LLM, k) combination.
 
@@ -42,9 +54,9 @@ def _output_path(config: RagConfig) -> Path:
     return Path("data/processed/answers") / f"{config.retriever}_{model}_k{config.k}.jsonl"
 
 
-def run(config: RagConfig) -> str:
-    """Answer every not-yet-answered QA and append results to a JSONL. Returns its path."""
-    qas = load_golden_set(config.golden_set_path)
+def run(config: RagConfig, qa_id: str | None = None) -> str:
+    """Answer every not-yet-answered QA (or just ``qa_id``) and append results to a JSONL."""
+    qas = _select(load_golden_set(config.golden_set_path), qa_id)
 
     out_path = _output_path(config)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -88,7 +100,9 @@ def main() -> None:
         description="Answer FinanceBench QA with the naive RAG pipeline."
     )
     parser.add_argument("--config", required=True, help="Path to a RAG YAML config.")
-    run(load_rag_config(parser.parse_args().config))
+    parser.add_argument("--id", help="Answer only this QA id, skipping the rest.")
+    args = parser.parse_args()
+    run(load_rag_config(args.config), qa_id=args.id)
 
 
 if __name__ == "__main__":
