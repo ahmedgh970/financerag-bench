@@ -16,7 +16,7 @@ help:
 	@echo "  make chunk          Chunk parsed docs -> chunks.jsonl (CONFIG=...)"
 	@echo "  make index          Embed chunks.jsonl -> Qdrant collection (CONFIG=...)"
 	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
-	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=...)"
+	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=..., optional ID=<qa_id> for one question)"
 	@echo "  make serve          Start FastAPI server"
 	@echo "  make docker-up      Start Docker services (Qdrant, Langfuse)"
 	@echo "  make docker-down    Stop Docker services"
@@ -55,7 +55,7 @@ eval:
 	uv run python -m src.evaluation.runner --config $(CONFIG)
 
 answer:
-	uv run python -m src.rag.runner --config $(CONFIG)
+	uv run python -m src.rag.runner --config $(CONFIG) $(if $(ID),--id $(ID),)
 
 serve:
 	uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
