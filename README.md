@@ -39,18 +39,24 @@ the next milestone — results to follow.
 ## Quickstart
 
 ```bash
-# 1. Start services
+# 1. Start services (Qdrant + Langfuse)
 docker compose up -d
 
 # 2. Install dependencies
 make install-all
 
-# 3. Parse + chunk documents
+# 3. Build the corpus: parse -> chunk -> index into Qdrant
 make parse CONFIG=configs/parse/docling.yaml
 make chunk CONFIG=configs/chunk/docling_hybrid_512.yaml
+make index CONFIG=configs/index/docling_hybrid_512.yaml
 
-# 4. Run evaluation
-make eval CONFIG=configs/eval/hybrid512_dense.yaml
+# 4. Evaluate retrieval quality
+make eval CONFIG=configs/eval/hybrid512_reranked_dense.yaml
+
+# 5. Generate answers with the RAG pipeline (needs an LLM: GROQ_API_KEY, or a
+#    local Ollama via a configs/rag/*_ollama.yaml config)
+make answer CONFIG=configs/rag/naive_reranked_dense_512_k10_llama70b.yaml                            # all 150 QA
+make answer CONFIG=configs/rag/naive_reranked_dense_512_k10_llama70b.yaml ID=financebench_id_03029  # one QA
 ```
 
 ---
@@ -65,7 +71,8 @@ financerag-bench/
 │   ├── parse/
 │   ├── chunk/
 │   ├── index/
-│   └── eval/
+│   ├── eval/
+│   └── rag/                    # naive RAG: retriever × LLM × k
 ├── data/
 │   ├── pdfs/                      # 368 docs
 │   ├── jsons/                     # 150 QA pairs (FinanceBench open-source)
