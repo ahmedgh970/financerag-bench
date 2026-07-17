@@ -22,10 +22,10 @@ def test_answered_ids_reads_existing_records(tmp_path):
     assert _answered_ids(path) == {"a", "b"}
 
 
-def test_output_path_encodes_retriever_model_and_k():
+def test_output_path_encodes_retriever_corpus_model_and_k():
     cfg = RagConfig(
         chunks_path="x.jsonl",
-        collection_name="c",
+        collection_name="docling_hybrid_512_bge-m3",
         retriever="reranked",
         k=5,
         llm={"model": "groq/llama-3.1-8b-instant"},
@@ -33,7 +33,17 @@ def test_output_path_encodes_retriever_model_and_k():
 
     path = _output_path(cfg)
 
-    assert path.name == "reranked_groq_llama-3.1-8b-instant_k5.jsonl"
+    assert path.name == ("reranked_docling_hybrid_512_bge-m3_groq_llama-3.1-8b-instant_k5.jsonl")
+
+
+def test_output_path_differs_by_corpus():
+    """Same retriever/model/k but different corpora must not collide (the resume
+    logic would otherwise skip one corpus's QA as already answered by another)."""
+    common = dict(chunks_path="x.jsonl", retriever="reranked", k=5, llm={"model": "m"})
+    p512 = _output_path(RagConfig(collection_name="docling_hybrid_512_bge-m3", **common))
+    p1024 = _output_path(RagConfig(collection_name="docling_hybrid_1024_bge-m3", **common))
+
+    assert p512 != p1024
 
 
 def _qa(qa_id: str) -> QAItem:
