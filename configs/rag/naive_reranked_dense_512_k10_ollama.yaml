@@ -1,8 +1,9 @@
-# Eval: dense retriever reranked by a cross-encoder, docling-hybrid-512 corpus, doc-scoped.
+# RAG naïf : reranked(dense) -> Ollama Llama 3.1 8B — sans quota, local.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
 collection_name: docling_hybrid_512_bge-m3
 retriever: reranked
 base_retriever: dense
-reranker_model: BAAI/bge-reranker-v2-m3
-rerank_prefetch: 50
 doc_scoped: true
+k: 10
+llm:
+  model: ollama_chat/llama3.1:8b
