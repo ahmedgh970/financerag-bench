@@ -53,3 +53,18 @@ def load_judge_config(path: str) -> JudgeConfig:
     """Load and validate a judge config from a YAML file."""
     data = yaml.safe_load(Path(path).read_text()) or {}
     return JudgeConfig(**data)
+
+
+class RagasConfig(BaseModel):
+    """Parameters of a Ragas run: score an existing answers JSONL on faithfulness,
+    answer relevancy, context precision, and context recall."""
+
+    answers_path: str
+    llm: LLMConfig = Field(default_factory=LLMConfig)
+    embedding_model: str = "BAAI/bge-m3"
+
+
+def load_ragas_config(path: str) -> RagasConfig:
+    """Load and validate a Ragas config from a YAML file."""
+    data = yaml.safe_load(Path(path).read_text()) or {}
+    return RagasConfig(**data)
