@@ -1,0 +1,8 @@
+# Ragas stage: faithfulness/answer_relevancy/context_precision/context_recall
+# for reranked(dense) -> Ollama Llama 3.1 8B (k20) answers, judged by Ollama
+# Qwen2.5 14B-instruct (local, no quota, more capable than the 8B generator).
+# make ragas CONFIG=configs/ragas/ollama8b_k20.yaml
+
+answers_path: data/processed/answers/reranked_docling_hybrid_1024_bge-m3_ollama_chat_llama3.1:8b_k20.jsonl
+llm:
+  model: ollama_chat/qwen2.5:14b-instruct

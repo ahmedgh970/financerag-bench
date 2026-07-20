@@ -1,0 +1,6 @@
+# Judge stage: score reranked(dense) -> Ollama Llama 3.1 8B (k5) answers against gold.
+# make judge CONFIG=configs/judge/ollama8b_k5.yaml
+
+answers_path: data/processed/answers/reranked_docling_hybrid_1024_bge-m3_ollama_chat_llama3.1:8b_k5.jsonl
+llm:
+  model: groq/llama-3.3-70b-versatile
