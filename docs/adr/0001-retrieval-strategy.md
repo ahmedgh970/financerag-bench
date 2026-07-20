@@ -7,7 +7,7 @@ Accepté.
 ## Contexte
 
 Corpus : 368 filings SEC parsés avec Docling, chunkés avec le `HybridChunker`
-(budget 512 tokens, tokenizer BGE-M3). Index Qdrant `docling_hybrid_bge-m3`
+(budget 512 tokens, tokenizer BGE-M3). Index Qdrant `docling_hybrid_512_bge-m3`
 (183 687 points, embeddings BGE-M3 en fp16). Jeu de questions : les 150 QA
 FinanceBench (open-source), chacune rattachée à un `doc_name` (le filing dont
 elle provient).
@@ -39,7 +39,7 @@ lexical entre l'evidence et le corpus, dédupliquée par page).
 ## Résultats
 
 Toutes les lignes ci-dessous évaluent les 150 QA (0 skip), corpus
-`docling_hybrid_bge-m3` (chunker hybrid, 512 tokens).
+`docling_hybrid_512_bge-m3` (chunker hybrid, 512 tokens).
 
 | # | Retriever | Scope | recall@1 | recall@3 | recall@5 | recall@10 | MRR | nDCG@10 |
 |---|---|---|---|---|---|---|---|---|
@@ -207,6 +207,50 @@ grands que même 1024 ne peut réunir), voire en pâtir (dilution accrue sur
 des passages qui, eux, gagnaient à rester petits). Ce cas motive
 l'hypothèse testée par l'ablation ; il ne la remplace pas.
 
+## Distribution réelle des tailles de chunk
+
+**`max_tokens` est un plafond, pas une cible.** Le `HybridChunker` découpe
+d'abord par structure, puis applique un découpage token-aware et un merge
+optionnel des voisins sous-dimensionnés (`merge_peers`) — les tailles réelles
+forment donc une distribution, souvent bien en dessous du budget. Mesuré sur les
+trois corpus (tokenizer BGE-M3, le même que celui qui compte le budget ; script
+`scripts/chunk_size_dist.py`, `make chunk-dist`) :
+
+![Distribution réelle des tailles de chunk par budget max_tokens](assets/chunk_size_distribution.png)
+
+| Budget `max_tokens` | médiane réelle | moyenne | % ≤ 25 % du plafond | % > plafond | dont tableaux |
+|---|---|---|---|---|---|
+| 256 | 213 | 192 | 8,0 % | 24,9 % | 97,8 % |
+| 512 | 352 | 325 | 18,2 % | 18,3 % | 97,9 % |
+| 1024 | **369** | 471 | **38,5 %** | 9,8 % | 99,0 % |
+
+Deux constats non triviaux :
+
+1. **Les distributions se chevauchent massivement.** La médiane réelle bouge à
+   peine entre 512 et 1024 (352 → 369 tokens), et à 1024, 38,5 % des chunks font
+   ≤ 256 tokens. Le corpus « 1024 » n'est donc pas « des chunks deux fois plus
+   gros » : c'est majoritairement les mêmes petits chunks plus une longue traîne.
+   **Conséquence méthodologique : balayer `max_tokens` ne balaye pas linéairement
+   la taille réelle des chunks ; les étiquettes 256/512/1024 sont trompeuses, et
+   l'ablation n'est interprétable qu'avec cette distribution en main.**
+
+2. **La traîne au-dessus du plafond est faite de tableaux.** ~25 % des chunks
+   dépassent le plafond à 256 (jusqu'à 383 tokens), et parmi eux **97-99 % sont
+   des chunks porteurs de tableaux** (label `table` dans les métadonnées), contre
+   ~31-34 % dans l'ensemble. Le `HybridChunker` ne peut pas scinder un élément
+   atomique indivisible : un bloc de tableau plus long que le budget reste en un
+   seul chunk over-cap. Plus le budget est petit, plus d'éléments le crèvent
+   (25 % à 256 → 10 % à 1024).
+
+**Lien avec l'étude de cas ci-dessus.** Les deux pointent le même coupable : les
+**tableaux financiers**. Le cas `financebench_id_04672` montrait un bilan
+fragmenté en sous-chunks (actifs/passifs/capitaux) à 512 ; la distribution montre
+que ce sont précisément les tableaux qui saturent puis débordent le budget. La
+taille de chunk n'est donc pas un simple curseur « petit ↔ grand » : son effet
+passe surtout par la façon dont elle **fragmente ou réunit les tableaux**, ce qui
+varie d'un tableau à l'autre — d'où la prudence à ne rien changer par défaut
+avant l'ablation complète sur les 150 QA.
+
 ## Conséquences
 
 - L'harnais d'évaluation gagne un flag `doc_scoped` (`EvalConfig`) ; toute
@@ -221,7 +265,7 @@ l'hypothèse testée par l'ablation ; il ne la remplace pas.
   `Reranker` cross-encoder (`reranker_model`, `rerank_prefetch`), sans
   modification de l'harnais d'évaluation.
 - **Aucun changement de défaut décidé sur la taille de chunk** : le corpus
-  de référence reste `docling_hybrid_bge-m3` (512 tokens) tant que
+  de référence reste `docling_hybrid_512_bge-m3` (512 tokens) tant que
   l'ablation complète (256/512/1024 × 150 QA) n'a pas confirmé, à
   l'échelle du benchmark, la tendance observée sur ce cas isolé.
 - Reste à mesurer : l'ablation 256/512/1024 sur les 150 QA une fois les

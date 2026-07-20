@@ -21,9 +21,11 @@ dependencies = [
     # Evaluation
     "ragas>=0.1.0",
     # Orchestration
-    "langchain>=0.2.0",
-    "langchain-community>=0.2.0",
-    "langgraph>=0.1.0",
+    # Capped below 1.0: ragas 0.4.3 (latest) imports langchain_community.chat_models.vertexai,
+    # removed in the LangChain 1.x line — the 0.3.x line is what ragas expects.
+    "langchain>=0.2.0,<1.0",
+    "langchain-community>=0.2.0,<0.4",
+    "langgraph>=0.1.0,<1.0",
     # API
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.0",
@@ -54,6 +56,7 @@ dev = [
     "ruff>=0.4.0",
     "mypy>=1.10.0",
     "pre-commit>=3.7.0",
+    "matplotlib>=3.8.0",  # analysis/reporting scripts (scripts/)
 ]
 dashboard = [
     "streamlit>=1.35.0",
