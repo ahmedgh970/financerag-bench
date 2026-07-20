@@ -8,6 +8,8 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field
 
+from src.llm.config import LLMConfig
+
 
 class EvalConfig(BaseModel):
     """Parameters of a retrieval evaluation.
@@ -38,3 +40,16 @@ def load_eval_config(path: str) -> EvalConfig:
     """Load and validate an evaluation config from a YAML file."""
     data = yaml.safe_load(Path(path).read_text()) or {}
     return EvalConfig(**data)
+
+
+class JudgeConfig(BaseModel):
+    """Parameters of a judge run: score an existing answers JSONL against gold."""
+
+    answers_path: str
+    llm: LLMConfig = Field(default_factory=LLMConfig)
+
+
+def load_judge_config(path: str) -> JudgeConfig:
+    """Load and validate a judge config from a YAML file."""
+    data = yaml.safe_load(Path(path).read_text()) or {}
+    return JudgeConfig(**data)
