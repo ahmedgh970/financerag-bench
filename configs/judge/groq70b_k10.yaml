@@ -1,6 +1,0 @@
-# Judge stage: score reranked(dense) -> Groq Llama 3.3 70B (k10) answers against gold.
-# make judge CONFIG=configs/judge/groq70b_k10.yaml
-
-answers_path: data/processed/answers/reranked_docling_hybrid_1024_bge-m3_groq_llama-3.3-70b-versatile_k10.jsonl
-llm:
-  model: groq/llama-3.3-70b-versatile
