@@ -1,4 +1,4 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge chunk-dist serve docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge ragas chunk-dist serve docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/eval/hybrid512_dense.yaml
@@ -18,6 +18,7 @@ help:
 	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
 	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=..., optional ID=<qa_id> for one question)"
 	@echo "  make judge          Judge an answers file against gold -> data/processed/judged/ (CONFIG=..., optional ID=<qa_id> for one question)"
+	@echo "  make ragas          Score an answers file with Ragas -> data/processed/ragas/ (CONFIG=..., optional ID=<qa_id> or LIMIT=<n>)"
 	@echo "  make chunk-dist     Plot real chunk-size distribution per budget -> docs/adr/assets/ (needs install-all)"
 	@echo "  make serve          Start FastAPI server"
 	@echo "  make docker-up      Start Docker services (Qdrant, Langfuse)"
@@ -61,6 +62,9 @@ answer:
 
 judge:
 	uv run python -m src.evaluation.judge_runner --config $(CONFIG) $(if $(ID),--id $(ID),)
+
+ragas:
+	uv run python -m src.evaluation.ragas_runner --config $(CONFIG) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)
 
 chunk-dist:
 	uv run --no-sync python scripts/chunk_size_dist.py
