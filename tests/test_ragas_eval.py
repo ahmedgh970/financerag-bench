@@ -8,7 +8,7 @@ from src.llm.config import LLMConfig
 
 @pytest.mark.eval
 def test_score_record_returns_all_four_metrics_in_range():
-    metrics = build_metrics(LLMConfig(model="ollama_chat/qwen2.5:14b-instruct"))
+    metrics = build_metrics(LLMConfig(model="ollama_chat/mistral-nemo"), embedding_device="cpu")
     record = {
         "id": "smoke_test",
         "question": "What was the FY2018 capital expenditure for 3M?",
