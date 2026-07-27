@@ -24,7 +24,7 @@ from openai import (
     InternalServerError,
     RateLimitError,
 )
-from ragas.embeddings.huggingface_provider import HuggingFaceEmbeddings
+from ragas.embeddings import OpenAIEmbeddings
 from ragas.llms import llm_factory
 from ragas.metrics.collections import (
     AnswerRelevancy,
@@ -75,26 +75,21 @@ def _build_client(provider: str) -> AsyncOpenAI:
     return AsyncOpenAI(base_url=base_url, api_key=api_key)
 
 
-def _load_embeddings(model_name: str, device: str) -> HuggingFaceEmbeddings:
-    """BGE-M3 embeddings on the given ``device`` -- no auto-detection, no fallback.
+def _load_embeddings(model_name: str) -> OpenAIEmbeddings:
+    """BGE-M3 embeddings served by Ollama, not sentence-transformers/HF.
 
-    The caller picks the device explicitly (``RagasConfig.embedding_device``):
-    the LLM (Ollama) already dispatches GPU/CPU on its own based on free VRAM,
-    so leaving embeddings on CPU by default frees the whole GPU for the LLM
-    instead of the two competing for the same 8GB card.
-
-    Force safetensors weights: torch 2.5.1 (pinned for the cu121 GPU stack, see
-    src/vectorstore/embeddings.py) is below the 2.6 that transformers now
-    requires to load legacy .bin checkpoints (CVE-2025-32434).
+    Ollama serves bge-m3 through its own OpenAI-compatible endpoint
+    (`/v1/embeddings`), so this reuses the same AsyncOpenAI client pattern as
+    the LLM instead of loading a separate sentence-transformers model in this
+    process. Ollama picks its own GPU/CPU dispatch for it, same as the LLM --
+    no device to choose here, and no torch/safetensors pinning concern either
+    (that workaround only applied to the sentence-transformers path).
     """
-    return HuggingFaceEmbeddings(
-        model=model_name, device=device, model_kwargs={"use_safetensors": True}
-    )
+    client = _build_client("ollama_chat")
+    return OpenAIEmbeddings(client=client, model=model_name)
 
 
-def build_metrics(
-    llm_config: LLMConfig, embedding_model: str = "BAAI/bge-m3", embedding_device: str = "cpu"
-) -> dict:
+def build_metrics(llm_config: LLMConfig, embedding_model: str = "bge-m3") -> dict:
     """Instantiate the 4 metrics from an ``LLMConfig`` (litellm-style ``provider/model``)."""
     provider, model = llm_config.model.split("/", 1)
     client = _build_client(provider)
@@ -111,7 +106,7 @@ def build_metrics(
     # instructor raises IncompleteOutputException. Ragas's own docs recommend
     # 4096+ here; drive it from the config so it's tunable per run.
     llm = llm_factory(model, provider="openai", client=client, max_tokens=llm_config.max_tokens)
-    embeddings = _load_embeddings(embedding_model, embedding_device)
+    embeddings = _load_embeddings(embedding_model)
 
     return {
         "faithfulness": Faithfulness(llm),
