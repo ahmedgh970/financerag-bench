@@ -1,8 +1,11 @@
 # Ragas stage: faithfulness/answer_relevancy/context_precision/context_recall
 # for reranked(dense) -> Ollama Llama 3.1 8B (k5) answers, judged by Ollama
-# Qwen2.5 14B-instruct (local, no quota, more capable than the 8B generator).
+# Mistral Nemo 12B (local, no quota, more capable than the 8B generator).
 # make ragas CONFIG=configs/ragas/ollama8b_k5.yaml
 
 answers_path: data/processed/answers/reranked_docling_hybrid_1024_bge-m3_ollama_chat_llama3.1:8b_k5.jsonl
 llm:
-  model: ollama_chat/qwen2.5:14b-instruct
+  model: ollama_chat/llama3.1:8b
+  max_tokens: 4096  # structured output (faithfulness verdicts) needs headroom, Ragas default 1024 truncates
+
+embedding_device: cpu  # frees the whole GPU for the Ollama LLM

@@ -62,7 +62,7 @@ def run(config: RagasConfig, qa_id: str | None = None, limit: int | None = None)
         print(f"All {len(records)} answers already scored -> {out_path}")
         return str(out_path)
 
-    metrics = build_metrics(config.llm, config.embedding_model)
+    metrics = build_metrics(config.llm, config.embedding_model, config.embedding_device)
 
     totals = {
         k: 0.0 for k in ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
