@@ -32,7 +32,6 @@ MODELS = [
     "qwen3.5:9b",
     "gemma4:12b",
     "mistral-nemo",
-    "phi4",
 ]
 
 

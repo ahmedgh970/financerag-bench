@@ -39,15 +39,31 @@ PROMPTS_FILE = Path(
 RAG_CONFIG = "configs/rag/naive_reranked_dense_1024_k5_ollama.yaml"
 QUESTION_ID = "financebench_id_03029"
 KS = [5, 10, 20]
-OUTPUT_BUDGET = 2048  # tokens reserved for the model's answer within num_ctx
+
+# num_ctx per k: measured directly (not estimated) on the real corpus -- the
+# max real-token count across all 150 questions per k, with mistral:7b (the
+# most expensive tokenizer in the lineup) + 1024 tokens output budget, rounded
+# up to 2048. No extra margin: this is already the true worst case, not a proxy.
+TARGET_NUM_CTX = {5: 10240, 10: 18432, 20: 30720}
 
 # model name -> architectural max context length (from `ollama show`)
 MODELS = {
-    "gemma2:9b": 8192,
+    "llama3.2:3b": 131072,
+    "granite4.1:3b": 131072,
+    "qwen3.5:4b": 262144,
+    "mistral:7b": 32768,
+    "command-r7b": 8192,
     "llama3.1:8b": 131072,
-    "qwen2.5:14b-instruct": 32768,
+    "granite4.1:8b": 131072,
+    "qwen3.5:9b": 262144,
+    "gemma4:12b": 262144,
     "mistral-nemo": 1024000,
 }
+
+# command-r7b's own context (8192) is below the shared k5 budget (10240) --
+# run it at its own max instead of skipping it outright, since it's still the
+# lineup's fastest/smallest option and k5 is its one usable depth.
+NUM_CTX_OVERRIDE = {("command-r7b", 5): 8192}
 
 
 # --------------------------------------------------------------------------- #
@@ -105,10 +121,6 @@ def _remove_variant(name: str) -> None:
     subprocess.run(["ollama", "rm", name], capture_output=True)
 
 
-def _round_up(x: int, step: int = 2048) -> int:
-    return ((x + step - 1) // step) * step
-
-
 def measure(model: str, num_ctx: int, prompt: str) -> dict:
     """Load ``model`` at ``num_ctx``, run the prompt, return timing + dispatch + VRAM."""
     variant = _create_variant(model, num_ctx)
@@ -157,15 +169,12 @@ def phase_bench() -> None:
         p = prompts[str(k)]
         print(f"  k={k:2d}: {p['n_chunks']} chunks, {p['chars']} chars")
 
-    # num_ctx target per k: conservative token estimate (~3 chars/token for
-    # dense financial/tabular text) + output budget, rounded up to 2048.
-    targets = {k: _round_up(prompts[str(k)]["chars"] // 3 + OUTPUT_BUDGET) for k in KS}
-    print("\nnum_ctx target per k:", {k: targets[k] for k in KS})
+    print("\nnum_ctx target per k:", TARGET_NUM_CTX)
 
     rows = []
     for model, archmax in MODELS.items():
         for k in KS:
-            nctx = targets[k]
+            nctx = NUM_CTX_OVERRIDE.get((model, k), TARGET_NUM_CTX[k])
             if nctx > archmax:
                 print(f"\n{model} | k={k} | num_ctx {nctx} > arch max {archmax} -> OUT OF CONTEXT")
                 rows.append({"model": model, "k": k, "num_ctx": nctx, "status": "OUT_OF_CONTEXT"})
