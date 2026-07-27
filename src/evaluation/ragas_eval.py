@@ -14,10 +14,8 @@ is needed per run.
 
 from __future__ import annotations
 
-import logging
 import os
 
-import torch
 from dotenv import load_dotenv
 from openai import (
     APIConnectionError,
@@ -77,33 +75,26 @@ def _build_client(provider: str) -> AsyncOpenAI:
     return AsyncOpenAI(base_url=base_url, api_key=api_key)
 
 
-def _load_embeddings(model_name: str) -> HuggingFaceEmbeddings:
-    """BGE-M3 embeddings, GPU if there's room, CPU otherwise.
+def _load_embeddings(model_name: str, device: str) -> HuggingFaceEmbeddings:
+    """BGE-M3 embeddings on the given ``device`` -- no auto-detection, no fallback.
 
-    Mirrors Ollama's own graceful GPU/CPU dispatch: try CUDA first (fast), but
-    unlike Ollama's server, sentence-transformers has no built-in fallback --
-    a CUDA OOM here is a hard crash, not a silent CPU retry. A concurrent
-    retriever/reranker process can already be using most of an 8GB GPU, so
-    catch that one failure mode and retry on CPU instead of taking the
-    process down.
+    The caller picks the device explicitly (``RagasConfig.embedding_device``):
+    the LLM (Ollama) already dispatches GPU/CPU on its own based on free VRAM,
+    so leaving embeddings on CPU by default frees the whole GPU for the LLM
+    instead of the two competing for the same 8GB card.
 
-    Force safetensors weights either way: torch 2.5.1 (pinned for the cu121
-    GPU stack, see src/vectorstore/embeddings.py) is below the 2.6 that
-    transformers now requires to load legacy .bin checkpoints (CVE-2025-32434).
+    Force safetensors weights: torch 2.5.1 (pinned for the cu121 GPU stack, see
+    src/vectorstore/embeddings.py) is below the 2.6 that transformers now
+    requires to load legacy .bin checkpoints (CVE-2025-32434).
     """
-    try:
-        return HuggingFaceEmbeddings(model=model_name, model_kwargs={"use_safetensors": True})
-    except RuntimeError as e:
-        if "out of memory" not in str(e).lower():
-            raise
-        logging.warning("GPU out of memory loading %s embeddings, falling back to CPU", model_name)
-        torch.cuda.empty_cache()
-        return HuggingFaceEmbeddings(
-            model=model_name, device="cpu", model_kwargs={"use_safetensors": True}
-        )
+    return HuggingFaceEmbeddings(
+        model=model_name, device=device, model_kwargs={"use_safetensors": True}
+    )
 
 
-def build_metrics(llm_config: LLMConfig, embedding_model: str = "BAAI/bge-m3") -> dict:
+def build_metrics(
+    llm_config: LLMConfig, embedding_model: str = "BAAI/bge-m3", embedding_device: str = "cpu"
+) -> dict:
     """Instantiate the 4 metrics from an ``LLMConfig`` (litellm-style ``provider/model``)."""
     provider, model = llm_config.model.split("/", 1)
     client = _build_client(provider)
@@ -113,8 +104,14 @@ def build_metrics(llm_config: LLMConfig, embedding_model: str = "BAAI/bge-m3") -
     # AsyncOpenAI client (pointed at Groq's/Ollama's OpenAI-compatible
     # endpoint) doesn't have. "openai" is the correct strategy for any
     # OpenAI-shaped client, regardless of which backend it actually talks to.
-    llm = llm_factory(model, provider="openai", client=client)
-    embeddings = _load_embeddings(embedding_model)
+    #
+    # max_tokens: Ragas defaults to 1024, too low for structured output --
+    # faithfulness emits one JSON verdict per statement, and a long generated
+    # answer yields many statements, so the JSON gets truncated mid-object and
+    # instructor raises IncompleteOutputException. Ragas's own docs recommend
+    # 4096+ here; drive it from the config so it's tunable per run.
+    llm = llm_factory(model, provider="openai", client=client, max_tokens=llm_config.max_tokens)
+    embeddings = _load_embeddings(embedding_model, embedding_device)
 
     return {
         "faithfulness": Faithfulness(llm),

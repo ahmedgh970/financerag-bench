@@ -3,4 +3,4 @@
 
 answers_path: data/processed/answers/reranked_docling_hybrid_1024_bge-m3_ollama_chat_llama3.1:8b_k5.jsonl
 llm:
-  model: groq/llama-3.3-70b-versatile
+  model: ollama_chat/llama3.1:8b #ollama_chat/mistral-nemo #groq/llama-3.3-70b-versatile
