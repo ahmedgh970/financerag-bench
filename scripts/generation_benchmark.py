@@ -121,9 +121,17 @@ def _remove_variant(name: str) -> None:
     subprocess.run(["ollama", "rm", name], capture_output=True)
 
 
-def _chat(variant: str, prompt: str) -> tuple[str, float]:
+def _chat(variant: str, prompt: str) -> tuple[str, float, str]:
     """Chat-complete ``prompt`` on the loaded ``variant``; matches the ollama_chat/*
-    litellm route `make answer` uses (single user turn, no system prompt)."""
+    litellm route `make answer` uses (single user turn, no system prompt).
+
+    ``think: False`` disables the reasoning channel on thinking-capable models
+    (qwen3.5, gemma4). Left enabled, their chain-of-thought is emitted first and
+    can exhaust the ``num_predict`` budget before any answer token is produced,
+    so Ollama returns an empty ``content`` (the reasoning lands in a separate
+    ``thinking`` field that is scratch work, not the answer). Plain-instruct
+    models ignore the flag, so it is safe to send unconditionally.
+    """
     start = time.perf_counter()
     r = requests.post(
         f"{OLLAMA}/api/chat",
@@ -131,13 +139,14 @@ def _chat(variant: str, prompt: str) -> tuple[str, float]:
             "model": variant,
             "messages": [{"role": "user", "content": prompt}],
             "stream": False,
+            "think": False,
             "keep_alive": "30m",
             "options": {"temperature": TEMPERATURE, "num_predict": NUM_PREDICT},
         },
         timeout=1800,
     ).json()
     latency = time.perf_counter() - start
-    return r.get("message", {}).get("content", ""), latency
+    return r.get("message", {}).get("content", ""), latency, r.get("done_reason", "")
 
 
 def _run_one(model: str, k: int, num_ctx: int, limit: int | None) -> None:
@@ -161,11 +170,15 @@ def _run_one(model: str, k: int, num_ctx: int, limit: int | None) -> None:
     variant = _create_variant(model, num_ctx)
     _unload_all()
     elapsed = 0.0
+    empties = 0
     try:
         with out_path.open("a", encoding="utf-8") as f:
             for rec in tqdm(remaining, desc=f"{model} k={k} (ctx={num_ctx})"):
-                text, latency = _chat(variant, rec["prompt"])
+                text, latency, done_reason = _chat(variant, rec["prompt"])
                 elapsed += latency
+                if not text.strip():
+                    empties += 1
+                    tqdm.write(f"  EMPTY content for {rec['id']} (done_reason={done_reason!r})")
                 out = {
                     "id": rec["id"],
                     "question": rec["question"],
@@ -181,9 +194,10 @@ def _run_one(model: str, k: int, num_ctx: int, limit: int | None) -> None:
 
     budget_s = BUDGET_HOURS * 3600
     flag = " -- OVER BUDGET" if elapsed > budget_s else ""
+    empty_flag = f" -- {empties} EMPTY" if empties else ""
     print(
         f"  k={k}: answered {len(remaining)} new QA (skipped {len(done)}) in "
-        f"{elapsed / 60:.1f} min (budget {BUDGET_HOURS}h){flag} -> {out_path}"
+        f"{elapsed / 60:.1f} min (budget {BUDGET_HOURS}h){flag}{empty_flag} -> {out_path}"
     )
 
 

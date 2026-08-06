@@ -76,10 +76,20 @@ def generate(prompt: str, config: LLMConfig) -> str:
     a request that can never succeed.
     """
     _check_request_size(prompt, config)
+    extra: dict = {}
+    if config.model.startswith(("ollama_chat/", "ollama/")):
+        # Disable the reasoning channel on thinking-capable Ollama models
+        # (qwen3.5, gemma4): left on, their chain-of-thought is emitted first
+        # and can exhaust max_tokens before any answer token, so the response
+        # comes back with empty content. LiteLLM maps a reasoning_effort not in
+        # {low, medium, high} to Ollama's think=False; plain-instruct models
+        # ignore it. Ollama-only so non-Ollama providers aren't sent the flag.
+        extra["reasoning_effort"] = "none"
     response = litellm.completion(
         model=config.model,
         messages=[{"role": "user", "content": prompt}],
         temperature=config.temperature,
         max_tokens=config.max_tokens,
+        **extra,
     )
     return response.choices[0].message.content
