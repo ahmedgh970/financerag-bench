@@ -39,3 +39,35 @@ def test_check_request_size_skips_unknown_models():
 
     config = LLMConfig(model="groq/some-future-model")
     _check_request_size("word " * 30_000, config)  # no known limit -> no raise
+
+
+def _capture_completion_kwargs(monkeypatch) -> dict:
+    """Patch litellm.completion to record its kwargs and return a canned answer."""
+    from src.llm import client
+
+    captured: dict = {}
+
+    def fake_completion(**kwargs):
+        captured.update(kwargs)
+        message = type("M", (), {"content": "ok"})()
+        choice = type("C", (), {"message": message})()
+        return type("R", (), {"choices": [choice]})()
+
+    monkeypatch.setattr(client.litellm, "completion", fake_completion)
+    return captured
+
+
+def test_generate_disables_thinking_for_ollama(monkeypatch):
+    # Thinking-capable Ollama models must be told think=False (via
+    # reasoning_effort="none") or their reasoning can exhaust max_tokens and
+    # return empty content.
+    captured = _capture_completion_kwargs(monkeypatch)
+    generate("hi", LLMConfig(model="ollama_chat/qwen3.5:4b"))
+    assert captured["reasoning_effort"] == "none"
+
+
+def test_generate_omits_reasoning_effort_for_non_ollama(monkeypatch):
+    # Non-Ollama providers must not receive the flag (it can be rejected).
+    captured = _capture_completion_kwargs(monkeypatch)
+    generate("hi", LLMConfig(model="groq/llama-3.3-70b-versatile"))
+    assert "reasoning_effort" not in captured

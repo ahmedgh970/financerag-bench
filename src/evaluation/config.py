@@ -61,12 +61,10 @@ class RagasConfig(BaseModel):
 
     answers_path: str
     llm: LLMConfig = Field(default_factory=LLMConfig)
-    embedding_model: str = "BAAI/bge-m3"
-    # CPU by default: leaves the whole GPU free for the LLM, which (via Ollama)
-    # already dispatches GPU/CPU on its own based on free VRAM -- the two
-    # shouldn't compete for the same 8GB card. Set to "cuda" explicitly if the
-    # GPU has enough headroom for both.
-    embedding_device: str = "cpu"
+    # Ollama's own bge-m3 (served through its OpenAI-compatible endpoint), not
+    # a separate sentence-transformers load -- Ollama picks its own GPU/CPU
+    # dispatch for it, same as the LLM.
+    embedding_model: str = "bge-m3"
 
 
 def load_ragas_config(path: str) -> RagasConfig:
