@@ -42,30 +42,43 @@ The generation stage runs open-weight LLMs locally via Ollama on a single 8GB
 GPU (with automatic GPU/CPU layer offload for models that don't fully fit). The
 lineup is capped at **~14B params** — the largest that keeps the majority of
 layers on GPU; beyond that, inference is CPU-bound and impractical for the
-150 QA × k grid. Specs measured on the actual hardware (`scripts/ollama_model_specs.py`):
+150 QA grid. Specs below were measured on the actual hardware:
 
-| Model | Params | Context | Disk | VRAM @8K ctx | k feasible | Angle |
-|---|---|---|---|---|---|---|
-| `llama3.2:3b` | 3.2B | 128K | 2.0 GB | 3.1 GB · 100% GPU | 5/10/20 | Meta — small, fast floor |
-| `granite4.1:3b` | 3.4B | 128K | 2.1 GB | 2.9 GB · 100% GPU | 5/10/20 | IBM (newest) — dense 3B |
-| `qwen3.5:4b` | 4.7B | 256K | 3.4 GB | 3.4 GB · 100% GPU | 5/10/20 | Alibaba (newest) — small |
-| `mistral:7b` | 7.2B | 32K | 4.4 GB | 5.6 GB · 100% GPU | 5/10/20 | Mistral |
-| `command-r7b` | 8.0B | **8K** | 5.1 GB | 5.6 GB · 100% GPU | **5** | Cohere — RAG-native (8K → k5 only) |
-| `llama3.1:8b` | 8.0B | 128K | 4.9 GB | 5.8 GB · 100% GPU | 5/10/20 | Meta — baseline |
-| `granite4.1:8b` | 8.8B | 128K | 5.3 GB | 6.6 GB · 100% GPU | 5/10/20 | IBM (newest) — enterprise/finance |
-| `qwen3.5:9b` | 9.7B | 256K | 6.6 GB | 5.8 GB · 100% GPU | 5/10/20 | Alibaba (newest) |
-| `gemma4:12b` | 11.9B | 256K | 7.6 GB | 8.1 GB · 83% GPU | 5/10/20 | Google (newest) |
-| `mistral-nemo` | 12.2B | 1M | 7.1 GB | 8.6 GB · 80% GPU | 5/10/20 | Mistral — mid tier |
 
-*Context = model's max window. Disk = on-disk size. VRAM @8K =
-loaded footprint at `num_ctx=8192`, total size and GPU share; it grows with k
-as the KV cache scales. k feasible = which retrieval depths fit the model's
-context, given per-k `num_ctx` budgets of **10240 / 18432 / 30720** for
-k=5 / 10 / 20 — the true max real-prompt token count across all 150 questions
-(measured with `mistral:7b`, the most expensive tokenizer in the lineup) plus
-a 1024-token output budget, no extra margin. `command-r7b`'s own context (8K)
-is below the shared k5 budget (10240), so it runs at its own max instead for
-k5 rather than being excluded outright.*
+| Model | Params | Context | Disk | VRAM @8K ctx | Angle |
+|---|---|---|---|---|---|
+| `llama3.2:3b` | 3.2B | 128K | 2.0 GB | 3.1 GB · 100% GPU | Meta — small, fast floor |
+| `granite4.1:3b` | 3.4B | 128K | 2.1 GB | 2.9 GB · 100% GPU | IBM (newest) — dense 3B |
+| `qwen3.5:4b` | 4.7B | 256K | 3.4 GB | 3.4 GB · 100% GPU | Alibaba (newest) — small |
+| `mistral:7b` | 7.2B | 32K | 4.4 GB | 5.6 GB · 100% GPU | Mistral |
+| `command-r7b` | 8.0B | **8K** | 5.1 GB | 5.6 GB · 100% GPU | Cohere — RAG-native |
+| `llama3.1:8b` | 8.0B | 128K | 4.9 GB | 5.8 GB · 100% GPU | Meta — baseline |
+| `granite4.1:8b` | 8.8B | 128K | 5.3 GB | 6.6 GB · 100% GPU | IBM (newest) — enterprise/finance |
+| `qwen3.5:9b` | 9.7B | 256K | 6.6 GB | 5.8 GB · 100% GPU | Alibaba (newest) |
+| `gemma4:12b` | 11.9B | 256K | 7.6 GB | 8.1 GB · 83% GPU | Google (newest) |
+| `mistral-nemo` | 12.2B | 1M | 7.1 GB | 8.6 GB · 80% GPU | Mistral — mid tier |
+
+*Context = model's max window. Disk = on-disk size. VRAM @8K = loaded footprint
+at `num_ctx=8192`, total size and GPU share.*
+
+**Retrieval depth (k) and cached context.** Each model is benchmarked at
+`k = 5 / 10 / 20` retrieved chunks. Every k fixes the `num_ctx` (the KV-cache
+context reserved per request) to the true max real-prompt token count across
+all 150 questions at that depth — measured with `mistral:7b`, the lineup's most
+expensive tokenizer — plus a 1024-token output budget:
+
+| k | `num_ctx` (cached context) |
+|---|---|
+| 5 | 10240 |
+| 10 | 18432 |
+| 20 | 30720 |
+
+Two exceptions to the full k sweep: **`command-r7b`** runs at `k=5` only — its
+8K context can't hold the larger budgets (and even at k5 it runs at its own 8K
+max rather than 10240). **`gemma4:12b`** and **`mistral-nemo`** are also `k=5`
+only — their context is large enough, but they're the two models with partial
+CPU offload (83% / 80% GPU), which makes generation at k=10/20 too slow to be
+practical. All other models cover the full `k = 5 / 10 / 20`.
 
 ---
 
