@@ -1,4 +1,4 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge ragas prompts generate chunk-dist serve docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge ragas prompts generate judge-all chunk-dist serve docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/eval/hybrid512_dense.yaml
@@ -21,6 +21,7 @@ help:
 	@echo "  make ragas          Score an answers file with Ragas -> data/processed/ragas/ (CONFIG=..., optional ID=<qa_id> or LIMIT=<n>)"
 	@echo "  make prompts        Pre-materialize generation prompts per question x k -> data/processed/prompts/ (optional LIMIT=<n>)"
 	@echo "  make generate       Run the local Ollama lineup on materialized prompts -> data/processed/answers/ (optional MODELS=, KS=, LIMIT=)"
+	@echo "  make judge-all      Judge every answers file -> data/processed/judged/ + accuracy table (optional MODEL=, MAX_FILES=)"
 	@echo "  make chunk-dist     Plot real chunk-size distribution per budget -> docs/adr/assets/ (needs install-all)"
 	@echo "  make serve          Start FastAPI server"
 	@echo "  make docker-up      Start Docker services (Qdrant, Langfuse)"
@@ -73,6 +74,9 @@ prompts:
 
 generate:
 	uv run python scripts/generation_benchmark.py $(if $(MODELS),--models $(MODELS),) $(if $(KS),--ks $(KS),) $(if $(LIMIT),--limit $(LIMIT),)
+
+judge-all:
+	uv run python scripts/eval_all.py $(if $(MODEL),--model $(MODEL),) $(if $(MAX_FILES),--max-files $(MAX_FILES),)
 
 chunk-dist:
 	uv run --no-sync python scripts/chunk_size_dist.py
