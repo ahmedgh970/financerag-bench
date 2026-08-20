@@ -31,8 +31,25 @@ for the full comparison including BM25 and hybrid fusion):
 | Dense (doc-scoped) | 0.402 | 0.552 | 0.338 | 0.377 |
 | **Dense + cross-encoder reranker** (default) | **0.549** | **0.649** | **0.433** | **0.473** |
 
-End-to-end generation quality (LLM-judged answer accuracy, faithfulness) is
-the next milestone — results to follow.
+End-to-end generation quality on the 150 QA (corpus `docling_hybrid_1024_bge-m3`,
+`reranked(dense)`, doc-scoped), LLM-judged on `equivalent` (answer **correct AND
+grounded** in the retrieved context). Best point per model — full table, depth
+ablation and analysis in [ADR 0002](docs/adr/0002-generation-model.md):
+
+| Model | Params | equivalent (best k) |
+|---|---|---|
+| **granite4.1:8b** | 8.8B | **65.3** (k20) |
+| qwen3.5:4b | 4.7B | 60.0 (k20) |
+| qwen3.5:9b | 9.7B | 58.0 (k20) |
+| llama3.1:8b | 8.0B | 50.7 (k20) |
+| mistral-nemo | 12.2B | 47.3 (k5) |
+| mistral:7b | 7.2B | 41.3 (k20) |
+| granite4.1:3b | 3.4B | 40.0 (k5) |
+| command-r7b | 8.0B | 38.7 (k5) |
+| llama3.2:3b | 3.2B | 28.7 (k10) |
+
+Key finding: **useful retrieval depth scales with model capability** — the
+k10→k20 step only helps the strongest models (flat for the 3B tier). See ADR 0002.
 
 ---
 
@@ -55,7 +72,6 @@ layers on GPU; beyond that, inference is CPU-bound and impractical for the
 | `llama3.1:8b` | 8.0B | 128K | 4.9 GB | 5.8 GB · 100% GPU | Meta — baseline |
 | `granite4.1:8b` | 8.8B | 128K | 5.3 GB | 6.6 GB · 100% GPU | IBM (newest) — enterprise/finance |
 | `qwen3.5:9b` | 9.7B | 256K | 6.6 GB | 5.8 GB · 100% GPU | Alibaba (newest) |
-| `gemma4:12b` | 11.9B | 256K | 7.6 GB | 8.1 GB · 83% GPU | Google (newest) |
 | `mistral-nemo` | 12.2B | 1M | 7.1 GB | 8.6 GB · 80% GPU | Mistral — mid tier |
 
 *Context = model's max window. Disk = on-disk size. VRAM @8K = loaded footprint
@@ -75,10 +91,9 @@ expensive tokenizer — plus a 1024-token output budget:
 
 Two exceptions to the full k sweep: **`command-r7b`** runs at `k=5` only — its
 8K context can't hold the larger budgets (and even at k5 it runs at its own 8K
-max rather than 10240). **`gemma4:12b`** and **`mistral-nemo`** are also `k=5`
-only — their context is large enough, but they're the two models with partial
-CPU offload (83% / 80% GPU), which makes generation at k=10/20 too slow to be
-practical. All other models cover the full `k = 5 / 10 / 20`.
+max rather than 10240). **`mistral-nemo`** is also `k=5` only — its context is
+large enough, but its partial CPU offload (80% GPU) makes generation at k=10/20
+too slow to be practical. All other models cover the full `k = 5 / 10 / 20`.
 
 ---
 
