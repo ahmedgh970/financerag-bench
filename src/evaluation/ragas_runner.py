@@ -62,11 +62,9 @@ def run(config: RagasConfig, qa_id: str | None = None, limit: int | None = None)
         print(f"All {len(records)} answers already scored -> {out_path}")
         return str(out_path)
 
-    metrics = build_metrics(config.llm, config.embedding_model)
+    metrics = build_metrics(config.llm, config.embedding_model, config.metrics)
 
-    totals = {
-        k: 0.0 for k in ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
-    }
+    totals: dict[str, float] = {}
     with out_path.open("a", encoding="utf-8") as f:
         for r in tqdm(remaining, desc="ragas"):
             scores = score_record(r, metrics)
@@ -74,7 +72,7 @@ def run(config: RagasConfig, qa_id: str | None = None, limit: int | None = None)
             f.write(json.dumps(record) + "\n")
             f.flush()
             for k, v in scores.items():
-                totals[k] += v
+                totals[k] = totals.get(k, 0.0) + v
 
     n = len(remaining)
     summary = " | ".join(f"{k}={v / n:.3f}" for k, v in totals.items())
