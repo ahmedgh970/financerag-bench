@@ -89,8 +89,21 @@ def _load_embeddings(model_name: str) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(client=client, model=model_name)
 
 
-def build_metrics(llm_config: LLMConfig, embedding_model: str = "bge-m3") -> dict:
-    """Instantiate the 4 metrics from an ``LLMConfig`` (litellm-style ``provider/model``)."""
+ALL_METRICS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
+
+
+def build_metrics(
+    llm_config: LLMConfig,
+    embedding_model: str = "bge-m3",
+    metrics: list[str] | None = None,
+) -> dict:
+    """Instantiate the requested metrics from an ``LLMConfig`` (litellm-style ``provider/model``).
+
+    ``metrics`` selects a subset (default: all four). context_precision/recall
+    depend only on the retriever, so they are identical across generators at a
+    fixed k -- a run comparing models can drop them and keep only the
+    generation metrics (faithfulness, answer_relevancy).
+    """
     provider, model = llm_config.model.split("/", 1)
     client = _build_client(provider)
     # llm_factory's ``provider`` selects Ragas's instructor-patching strategy, not
@@ -106,46 +119,40 @@ def build_metrics(llm_config: LLMConfig, embedding_model: str = "bge-m3") -> dic
     # instructor raises IncompleteOutputException. Ragas's own docs recommend
     # 4096+ here; drive it from the config so it's tunable per run.
     llm = llm_factory(model, provider="openai", client=client, max_tokens=llm_config.max_tokens)
-    embeddings = _load_embeddings(embedding_model)
 
-    return {
-        "faithfulness": Faithfulness(llm),
-        "answer_relevancy": AnswerRelevancy(llm, embeddings),
-        "context_precision": ContextPrecisionWithReference(llm),
-        "context_recall": ContextRecall(llm),
+    selected = list(metrics) if metrics else list(ALL_METRICS)
+    unknown = [m for m in selected if m not in ALL_METRICS]
+    if unknown:
+        raise ValueError(f"Unknown Ragas metric(s): {unknown} (known: {ALL_METRICS})")
+
+    # Embeddings are only needed by answer_relevancy -- skip the load otherwise.
+    embeddings = _load_embeddings(embedding_model) if "answer_relevancy" in selected else None
+    builders = {
+        "faithfulness": lambda: Faithfulness(llm),
+        "answer_relevancy": lambda: AnswerRelevancy(llm, embeddings),
+        "context_precision": lambda: ContextPrecisionWithReference(llm),
+        "context_recall": lambda: ContextRecall(llm),
     }
+    return {name: builders[name]() for name in selected}
 
 
 def score_record(record: dict, metrics: dict) -> dict:
-    """Score one answers-JSONL record on all 4 metrics."""
+    """Score one answers-JSONL record on whichever metrics ``metrics`` contains."""
     user_input = record["question"]
     response = record["generated_answer"]
     reference = record["gold_answer"]
     retrieved_contexts = [s["text"] for s in record["sources"]]
 
-    faithfulness = _score(
-        metrics["faithfulness"],
-        user_input=user_input,
-        response=response,
-        retrieved_contexts=retrieved_contexts,
-    )
-    answer_relevancy = _score(metrics["answer_relevancy"], user_input=user_input, response=response)
-    context_precision = _score(
-        metrics["context_precision"],
-        user_input=user_input,
-        reference=reference,
-        retrieved_contexts=retrieved_contexts,
-    )
-    context_recall = _score(
-        metrics["context_recall"],
-        user_input=user_input,
-        retrieved_contexts=retrieved_contexts,
-        reference=reference,
-    )
-
-    return {
-        "faithfulness": faithfulness.value,
-        "answer_relevancy": answer_relevancy.value,
-        "context_precision": context_precision.value,
-        "context_recall": context_recall.value,
+    callers = {
+        "faithfulness": lambda m: _score(
+            m, user_input=user_input, response=response, retrieved_contexts=retrieved_contexts
+        ),
+        "answer_relevancy": lambda m: _score(m, user_input=user_input, response=response),
+        "context_precision": lambda m: _score(
+            m, user_input=user_input, reference=reference, retrieved_contexts=retrieved_contexts
+        ),
+        "context_recall": lambda m: _score(
+            m, user_input=user_input, retrieved_contexts=retrieved_contexts, reference=reference
+        ),
     }
+    return {name: callers[name](metric).value for name, metric in metrics.items()}
