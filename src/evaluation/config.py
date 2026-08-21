@@ -65,6 +65,10 @@ class RagasConfig(BaseModel):
     # a separate sentence-transformers load -- Ollama picks its own GPU/CPU
     # dispatch for it, same as the LLM.
     embedding_model: str = "bge-m3"
+    # Subset of metrics to score (None -> all four). context_precision/recall
+    # are retriever-only (identical across generators at fixed k), so a
+    # model-comparison run can keep just faithfulness/answer_relevancy.
+    metrics: list[str] | None = None
 
 
 def load_ragas_config(path: str) -> RagasConfig:
