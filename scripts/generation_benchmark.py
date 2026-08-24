@@ -123,7 +123,7 @@ def _remove_variant(name: str) -> None:
 
 def _chat(variant: str, prompt: str) -> tuple[str, float, str]:
     """Chat-complete ``prompt`` on the loaded ``variant``; matches the ollama_chat/*
-    litellm route `make answer` uses (single user turn, no system prompt).
+    chat route `make answer` uses (single user turn, no system prompt).
 
     ``think: False`` disables the reasoning channel on thinking-capable models
     (qwen3.5, gemma4). Left enabled, their chain-of-thought is emitted first and
