@@ -28,12 +28,12 @@ def test_output_path_encodes_retriever_corpus_model_and_k():
         collection_name="docling_hybrid_512_bge-m3",
         retriever="reranked",
         k=5,
-        llm={"model": "groq/llama-3.1-8b-instant"},
+        llm={"model": "ollama_chat/llama3.1:8b"},
     )
 
     path = _output_path(cfg)
 
-    assert path.name == ("reranked_docling_hybrid_512_bge-m3_groq_llama-3.1-8b-instant_k5.jsonl")
+    assert path.name == ("reranked_docling_hybrid_512_bge-m3_ollama_chat_llama3.1:8b_k5.jsonl")
 
 
 def test_output_path_differs_by_corpus():
