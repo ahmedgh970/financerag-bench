@@ -41,9 +41,11 @@ DEFAULT_KS = [10]
 # Critic served as a num_ctx variant: Ragas reaches Ollama through the OpenAI
 # endpoint, which can't pass num_ctx per request, so the base model would load
 # at Ollama's 4096 default and silently truncate the ~14k faithfulness prompt.
-# The variant (created on the fly) pins num_ctx; llama3.1:8b + its 16k KV +
-# bge-m3 stay co-resident (measured ~7.6 GB), so no swap.
-CRITIC_BASE = "llama3.1:8b"
+# The variant (created on the fly) pins num_ctx. mistral-nemo (12B) handles
+# answer_relevancy's structured output where the 8B critic fails, at the cost of
+# not co-residing with bge-m3 on 8 GB VRAM (7.9 GB + 16k KV + embeddings > 8 GB
+# -> Ollama swaps LLM<->embeddings, slower but correct).
+CRITIC_BASE = "mistral-nemo"
 CRITIC_NUM_CTX = 16384
 CRITIC_VARIANT = f"ragas-critic-{CRITIC_BASE.replace(':', '-')}-{CRITIC_NUM_CTX}"
 CRITIC_MODEL = f"ollama_chat/{CRITIC_VARIANT}"
@@ -51,8 +53,9 @@ CRITIC_MODEL = f"ollama_chat/{CRITIC_VARIANT}"
 # answers; its docs recommend 4096+.
 CRITIC_MAX_TOKENS = 4096
 EMBEDDING_MODEL = "bge-m3"
-# Generation metrics only: context_precision/recall are retriever-only
-# (identical across generators at fixed k) and already covered by ADR 0001.
+# Generation metrics: faithfulness (answer grounded in retrieved context) +
+# answer_relevancy (answer addresses the question). context_precision/recall are
+# retriever-only (identical across generators at fixed k, already in ADR 0001).
 METRICS = ["faithfulness", "answer_relevancy"]
 
 
