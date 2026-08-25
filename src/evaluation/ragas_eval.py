@@ -5,18 +5,15 @@ answer, source chunks, gold answer) -- no new retrieval call. Covers both the
 retriever (context precision/recall, reference-based) and the generator
 (faithfulness, answer relevancy, reference-free).
 
-Ragas expects an OpenAI-shaped client. Groq and Ollama both speak the
-OpenAI-compatible protocol natively, so a plain ``openai.AsyncOpenAI`` client
-is enough here -- Ragas's own documented path (``llm_factory``), simpler than
-wrapping LiteLLM through ``instructor`` for no benefit when only one provider
-is needed per run.
+Ragas expects an OpenAI-shaped client. Ollama serves the OpenAI-compatible
+protocol natively on ``/v1``, so a plain ``openai.AsyncOpenAI`` pointed at it is
+enough -- Ragas's own documented path (``llm_factory``), no provider layer.
 """
 
 from __future__ import annotations
 
 import os
 
-from dotenv import load_dotenv
 from openai import (
     APIConnectionError,
     APITimeoutError,
@@ -38,11 +35,10 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from src.llm.config import LLMConfig
 
 # Same transient-error/backoff policy as src/llm/client.py: Groq's TPM limit
-# resets on a ~60s rolling window, and Ragas scores a question with up to 4 LLM
-# calls (one per metric) -- several times our own judge's 1-call-per-question
-# budget -- so it hits this limit more often. instructor's own built-in
-# max_retries doesn't cover raw API errors like 429s (only response-validation
-# retries), hence wrapping each metric call here instead.
+# Retry transient transport failures around each metric call: instructor's own
+# built-in max_retries only covers response-validation retries, not raw API
+# errors, so wrap the call here. (No quota locally, but a busy Ollama can still
+# time out or drop a connection under the ~4 calls Ragas makes per question.)
 _TRANSIENT_ERRORS = (RateLimitError, APITimeoutError, APIConnectionError, InternalServerError)
 
 
@@ -55,24 +51,18 @@ def _score(metric, **kwargs) -> MetricResult:
     return metric.score(**kwargs)
 
 
-_BASE_URLS = {
-    "groq": "https://api.groq.com/openai/v1",
-    "ollama_chat": "http://localhost:11434/v1",
-}
-
-load_dotenv()
+_OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434") + "/v1"
 
 
-def _build_client(provider: str) -> AsyncOpenAI:
+def _build_client() -> AsyncOpenAI:
     # Async client: Ragas's sync .score() still drives everything through
     # asyncio.run(self.ascore(...)) internally, and refuses a sync client.
-    base_url = _BASE_URLS.get(provider)
-    if base_url is None:
-        raise ValueError(
-            f"Unsupported Ragas LLM provider: {provider!r} (known: {sorted(_BASE_URLS)})"
-        )
-    api_key = os.environ["GROQ_API_KEY"] if provider == "groq" else "ollama"
-    return AsyncOpenAI(base_url=base_url, api_key=api_key)
+    # Ollama needs no real key. A generous timeout (default is too low): a
+    # faithfulness call on a partly CPU-offloaded local critic can take minutes,
+    # and the per-call time balloons as the laptop GPU throttles under load --
+    # without this the read times out mid-run and instructor wraps it in a
+    # non-retryable error.
+    return AsyncOpenAI(base_url=_OLLAMA_BASE_URL, api_key="ollama", timeout=1800.0)
 
 
 def _load_embeddings(model_name: str) -> OpenAIEmbeddings:
@@ -85,7 +75,7 @@ def _load_embeddings(model_name: str) -> OpenAIEmbeddings:
     no device to choose here, and no torch/safetensors pinning concern either
     (that workaround only applied to the sentence-transformers path).
     """
-    client = _build_client("ollama_chat")
+    client = _build_client()
     return OpenAIEmbeddings(client=client, model=model_name)
 
 
@@ -97,21 +87,20 @@ def build_metrics(
     embedding_model: str = "bge-m3",
     metrics: list[str] | None = None,
 ) -> dict:
-    """Instantiate the requested metrics from an ``LLMConfig`` (litellm-style ``provider/model``).
+    """Instantiate the requested metrics from an ``LLMConfig``.
 
-    ``metrics`` selects a subset (default: all four). context_precision/recall
-    depend only on the retriever, so they are identical across generators at a
-    fixed k -- a run comparing models can drop them and keep only the
-    generation metrics (faithfulness, answer_relevancy).
+    ``llm_config.model`` keeps the ``ollama_chat/`` prefix (repo-wide naming
+    convention); the part after the ``/`` is the Ollama model name. ``metrics``
+    selects a subset (default: all four). context_precision/recall depend only
+    on the retriever, so they are identical across generators at a fixed k -- a
+    run comparing models can drop them and keep only the generation metrics
+    (faithfulness, answer_relevancy).
     """
-    provider, model = llm_config.model.split("/", 1)
-    client = _build_client(provider)
-    # llm_factory's ``provider`` selects Ragas's instructor-patching strategy, not
-    # the backend model provider -- "groq" maps to the native groq SDK's
-    # client.messages.create shape (Anthropic-like), which our plain
-    # AsyncOpenAI client (pointed at Groq's/Ollama's OpenAI-compatible
-    # endpoint) doesn't have. "openai" is the correct strategy for any
-    # OpenAI-shaped client, regardless of which backend it actually talks to.
+    model = llm_config.model.split("/", 1)[-1]
+    client = _build_client()
+    # llm_factory's ``provider="openai"`` selects Ragas's instructor-patching
+    # strategy for any OpenAI-shaped client, which is what our AsyncOpenAI
+    # (pointed at Ollama's /v1) is -- it is unrelated to the backend model.
     #
     # max_tokens: Ragas defaults to 1024, too low for structured output --
     # faithfulness emits one JSON verdict per statement, and a long generated

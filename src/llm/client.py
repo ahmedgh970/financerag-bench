@@ -1,95 +1,84 @@
-"""Thin LiteLLM wrapper: one function to call any provider/model uniformly.
+"""Thin Ollama client: one function to generate a completion locally.
 
-Retries transient failures (rate limits, timeouts, transport/server errors)
-with backoff; permanent failures (bad auth, bad request, content policy) fail
-immediately since retrying them can't help.
+The whole pipeline runs on local Ollama models (generation, judging, serving),
+so this talks to Ollama's native ``/api/chat`` endpoint directly -- no provider
+abstraction, no per-minute token guard (there is no quota locally). Transient
+transport failures (connection dropped, timeout, 5xx) are retried with backoff;
+a bad request fails immediately since retrying can't help.
 """
 
 from __future__ import annotations
 
-import litellm
-from litellm.exceptions import (
-    APIConnectionError,
-    BadGatewayError,
-    InternalServerError,
-    RateLimitError,
-    ServiceUnavailableError,
-    Timeout,
-)
+import os
+
+import requests
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.llm.config import LLMConfig
 
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
+
+# Upper bound on the auto-sized context window: a bigger KV cache than this
+# would not fit an 8 GB GPU and would spill to CPU.
+NUM_CTX_CAP = 32768
+
+# Transport-level failures worth retrying; a 4xx (bad request) is not among them.
 _TRANSIENT_ERRORS = (
-    RateLimitError,
-    Timeout,
-    APIConnectionError,
-    ServiceUnavailableError,
-    InternalServerError,
-    BadGatewayError,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.ChunkedEncodingError,
 )
 
-# Free-tier tokens-per-minute ceilings, confirmed from real 429/413 responses
-# (not guessed): a single request over this can never succeed no matter how
-# long we retry, since it exceeds even a fully-reset budget. Only models we
-# have actually hit a limit for are listed; unknown models skip the check.
-_KNOWN_TPM_LIMITS = {
-    "groq/llama-3.1-8b-instant": 6_000,
-    "groq/llama-3.3-70b-versatile": 12_000,
-}
+
+def _model_name(model: str) -> str:
+    """Strip a ``provider/`` prefix, keeping the Ollama model name.
+
+    Configs still name models ``ollama_chat/llama3.1:8b`` (the prefix drives the
+    output-file naming across the repo); Ollama itself wants just ``llama3.1:8b``.
+    """
+    return model.split("/", 1)[1] if "/" in model else model
 
 
-class RequestTooLargeError(Exception):
-    """A prompt is bigger than the model's own per-minute token budget."""
+def _auto_num_ctx(prompt: str, num_predict: int) -> int:
+    """Size the context window to the prompt so retrieved chunks aren't truncated.
 
-
-def _check_request_size(prompt: str, config: LLMConfig) -> None:
-    limit = _KNOWN_TPM_LIMITS.get(config.model)
-    if limit is None:
-        return
-    estimated = (
-        litellm.token_counter(model=config.model, messages=[{"role": "user", "content": prompt}])
-        + config.max_tokens
-    )
-    if estimated > limit:
-        raise RequestTooLargeError(
-            f"Prompt (~{estimated} tokens incl. completion budget) exceeds "
-            f"{config.model}'s known {limit} TPM limit — no retry can fix this. "
-            "Lower k (fewer/smaller chunks) or switch to a model with a higher limit."
-        )
+    Estimates prompt tokens as ~len/3 (conservative for the number-dense financial
+    text, which tokenizes denser than prose), adds the output budget and a small
+    margin, rounds up to 512, and caps at ``NUM_CTX_CAP``.
+    """
+    est = len(prompt) // 3 + num_predict + 256
+    rounded = ((est + 511) // 512) * 512
+    return min(NUM_CTX_CAP, max(2048, rounded))
 
 
 @retry(
     retry=retry_if_exception_type(_TRANSIENT_ERRORS),
-    # Free-tier rate limits (e.g. Groq's tokens-per-minute cap) reset on a
-    # ~60s rolling window, not in a couple seconds — a short backoff just
-    # burns through attempts and still fails. Wait long enough for that
-    # window to clear, and allow enough attempts to actually get through it.
-    stop=stop_after_attempt(6),
-    wait=wait_exponential(multiplier=2, min=5, max=60),
+    stop=stop_after_attempt(4),
+    wait=wait_exponential(multiplier=1, min=2, max=20),
 )
 def generate(prompt: str, config: LLMConfig) -> str:
-    """Generate a completion for ``prompt`` using ``config``.
+    """Generate a completion for ``prompt`` on a local Ollama model.
 
-    Fails immediately (no retry) if the prompt structurally exceeds the
-    model's known per-minute token budget, rather than exhausting retries on
-    a request that can never succeed.
+    ``think: False`` disables the reasoning channel on thinking-capable models
+    (qwen3.5, gemma4): left on, their chain-of-thought is emitted first and can
+    exhaust ``num_predict`` before any answer token, returning empty content.
+    Plain-instruct models ignore the flag, so it is always safe to send.
     """
-    _check_request_size(prompt, config)
-    extra: dict = {}
-    if config.model.startswith(("ollama_chat/", "ollama/")):
-        # Disable the reasoning channel on thinking-capable Ollama models
-        # (qwen3.5, gemma4): left on, their chain-of-thought is emitted first
-        # and can exhaust max_tokens before any answer token, so the response
-        # comes back with empty content. LiteLLM maps a reasoning_effort not in
-        # {low, medium, high} to Ollama's think=False; plain-instruct models
-        # ignore it. Ollama-only so non-Ollama providers aren't sent the flag.
-        extra["reasoning_effort"] = "none"
-    response = litellm.completion(
-        model=config.model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
-        **extra,
+    num_ctx = config.num_ctx or _auto_num_ctx(prompt, config.max_tokens)
+    response = requests.post(
+        f"{OLLAMA_URL}/api/chat",
+        json={
+            "model": _model_name(config.model),
+            "messages": [{"role": "user", "content": prompt}],
+            "stream": False,
+            "think": False,
+            "options": {
+                "temperature": config.temperature,
+                "num_predict": config.max_tokens,
+                "num_ctx": num_ctx,
+            },
+        },
+        timeout=1800,
     )
-    return response.choices[0].message.content
+    response.raise_for_status()
+    return response.json().get("message", {}).get("content", "")

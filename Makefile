@@ -1,4 +1,4 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge ragas prompts generate judge-all chunk-dist serve docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge ragas prompts generate judge-all chunk-dist serve demo docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/eval/hybrid512_dense.yaml
@@ -24,6 +24,7 @@ help:
 	@echo "  make judge-all      Judge every answers file -> data/processed/judged/ + accuracy table (optional MODEL=, MAX_FILES=)"
 	@echo "  make chunk-dist     Plot real chunk-size distribution per budget -> docs/adr/assets/ (needs install-all)"
 	@echo "  make serve          Start FastAPI server"
+	@echo "  make demo           Start the Gradio demo UI (needs make serve running)"
 	@echo "  make docker-up      Start Docker services (Qdrant, Langfuse)"
 	@echo "  make docker-down    Stop Docker services"
 	@echo "  make clean          Remove generated artefacts"
@@ -83,6 +84,9 @@ chunk-dist:
 
 serve:
 	uv run uvicorn src.api.main:app --reload --host 0.0.0.0 --port 8000
+
+demo:
+	uv run --extra demo python demo/app.py
 
 docker-up:
 	docker compose up -d

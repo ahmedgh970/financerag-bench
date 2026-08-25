@@ -9,8 +9,8 @@ dependencies = [
     "pandas>=2.0.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    # LLM abstraction
-    "litellm>=1.40.0",
+    # Local LLM serving (Ollama HTTP API)
+    "requests>=2.31.0",
     # Vector DB
     "qdrant-client>=1.9.0",
     # Embeddings (needed at serving time to embed queries)
