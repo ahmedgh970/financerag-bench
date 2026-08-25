@@ -18,15 +18,28 @@ def _client(monkeypatch) -> TestClient:
     return TestClient(main.app)
 
 
-def test_health_reports_served_config(monkeypatch):
+def test_health_ok(monkeypatch):
     with _client(monkeypatch) as client:
         body = client.get("/health").json()
     assert body["status"] == "ok"
-    assert body["model"] == "ollama_chat/granite4.1:8b"
-    assert body["k"] == 10
+    assert "granite" in body["config"]
 
 
-def test_ask_returns_answer_and_sources(monkeypatch):
+def test_options_lists_models_and_collections(monkeypatch):
+    monkeypatch.setattr(main, "_ollama_models", lambda: ["granite4.1:8b", "qwen3.5:4b"])
+    monkeypatch.setattr(main, "_qdrant_collections", lambda: ["docling_hybrid_1024_bge-m3"])
+    with _client(monkeypatch) as client:
+        body = client.get("/options").json()
+    assert body["models"] == ["granite4.1:8b", "qwen3.5:4b"]
+    assert body["collections"] == ["docling_hybrid_1024_bge-m3"]
+    assert body["defaults"] == {
+        "model": "granite4.1:8b",
+        "k": 10,
+        "collection": "docling_hybrid_1024_bge-m3",
+    }
+
+
+def test_ask_returns_answer_sources_and_echoes_choices(monkeypatch):
     chunk = Chunk(
         chunk_id="ACME_2022_10K::5",
         doc_id="ACME_2022_10K",
@@ -41,12 +54,17 @@ def test_ask_returns_answer_and_sources(monkeypatch):
         ),
     )
     with _client(monkeypatch) as client:
-        resp = client.post("/ask", json={"question": "What was FY2022 revenue?"})
+        resp = client.post(
+            "/ask", json={"question": "What was FY2022 revenue?", "k": 5, "model": "qwen3.5:4b"}
+        )
 
     assert resp.status_code == 200
     body = resp.json()
     assert body["answer"] == "$5,000 million"
     assert body["latency_s"] == 0.42
+    assert body["model"] == "qwen3.5:4b"  # request override echoed back
+    assert body["k"] == 5
+    assert body["collection"] == "docling_hybrid_1024_bge-m3"  # served default
     assert body["sources"] == [{"doc_id": "ACME_2022_10K", "page": 12, "text": chunk.text}]
 
 
