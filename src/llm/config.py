@@ -21,6 +21,9 @@ class LLMConfig(BaseModel):
     )
     temperature: float = 0.0
     max_tokens: int = 1024
+    # Context window. None -> the client sizes it to the prompt (so k retrieved
+    # chunks aren't silently truncated); set an int to pin it.
+    num_ctx: int | None = None
 
 
 def load_llm_config(path: str) -> LLMConfig:
