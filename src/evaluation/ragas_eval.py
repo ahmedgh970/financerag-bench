@@ -57,8 +57,12 @@ _OLLAMA_BASE_URL = os.getenv("OLLAMA_URL", "http://localhost:11434") + "/v1"
 def _build_client() -> AsyncOpenAI:
     # Async client: Ragas's sync .score() still drives everything through
     # asyncio.run(self.ascore(...)) internally, and refuses a sync client.
-    # Ollama needs no real key.
-    return AsyncOpenAI(base_url=_OLLAMA_BASE_URL, api_key="ollama")
+    # Ollama needs no real key. A generous timeout (default is too low): a
+    # faithfulness call on a partly CPU-offloaded local critic can take minutes,
+    # and the per-call time balloons as the laptop GPU throttles under load --
+    # without this the read times out mid-run and instructor wraps it in a
+    # non-retryable error.
+    return AsyncOpenAI(base_url=_OLLAMA_BASE_URL, api_key="ollama", timeout=1800.0)
 
 
 def _load_embeddings(model_name: str) -> OpenAIEmbeddings:
