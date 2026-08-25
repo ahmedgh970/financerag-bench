@@ -143,7 +143,7 @@ financerag-bench/
 │   ├── vectorstore/               # embeddings + Qdrant client, shared by indexing and retrieval
 │   ├── indexing/                  # offline job: chunks -> embeddings -> Qdrant
 │   ├── retrieval/                 # dense, BM25, hybrid, reranker
-│   ├── llm/                       # LiteLLM client + versioned prompts
+│   ├── llm/                       # Ollama client + versioned prompts
 │   ├── rag/                       # pipelines: naive → advanced → agentic
 │   ├── agents/                    # LangGraph: router, grader, rewriter
 │   ├── evaluation/                # retrieval metrics + Ragas + runner
@@ -163,7 +163,7 @@ financerag-bench/
 | Layer | Technology |
 |---|---|
 | Language | Python 3.11+, uv |
-| LLM abstraction | LiteLLM + Ollama |
+| LLM serving | Ollama (local) |
 | Agent orchestration | LangChain + LangGraph |
 | Vector DB | Qdrant |
 | Lexical search | BM25 |

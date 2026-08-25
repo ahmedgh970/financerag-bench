@@ -1,0 +1,11 @@
+# Serving config for the API: reranked(dense) -> Ollama Granite 4.1 8B at k=10.
+# granite4.1:8b is the best judged generator (ADR 0002); k10 (equivalent 62.0)
+# is the lighter default for interactive serving vs k20 (65.3).
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+collection_name: docling_hybrid_1024_bge-m3
+retriever: reranked
+base_retriever: dense
+doc_scoped: true
+k: 10
+llm:
+  model: ollama_chat/granite4.1:8b
