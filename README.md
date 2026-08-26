@@ -1,6 +1,6 @@
 # financerag-bench
 
-> End-to-end RAG & Agentic RAG benchmark on [FinanceBench](https://github.com/patronus-ai/financebench) — 150 financial QA pairs, 368 SEC filings (10-K/10-Q).
+> End-to-end RAG & Agentic RAG benchmark on [FinanceBench](https://github.com/patronus-ai/financebench); 150 financial QA pairs, 368 SEC filings (10-K/10-Q).
 > From naive retrieval to multi-agent system, every improvement is justified by a number.
 
 ![CI](https://github.com/ahmedgh970/financerag-bench/actions/workflows/ci.yml/badge.svg)
@@ -16,6 +16,35 @@ FinanceBench shows that state-of-the-art RAG systems fail on ~80% of financial q
 - Progression: naive RAG → hybrid search + reranking → agentic RAG → multi-agent
 - Multi-LLM open-source benchmark (quality / latency / cost)
 - Production patterns: observability (Langfuse), CI with eval regression, FastAPI serving
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  subgraph Ingestion["Ingestion (offline)"]
+    PDF[SEC filings · PDF] --> Parse[Parse · Docling]
+    Parse --> Chunk[Chunk · HybridChunker 1024]
+    Chunk --> Embed[Embed · BGE-M3]
+    Embed --> Q[(Qdrant)]
+  end
+  subgraph Serving["Serving (online, 100% local)"]
+    UI[UI · Gradio] -->|POST /ask| API[API · FastAPI]
+    API --> R[Retrieve · dense]
+    R --> Q
+    R --> RR[Rerank · cross-encoder]
+    RR --> P[Grounded prompt]
+    P --> LLM[Generate · Ollama granite4.1:8b]
+    LLM --> API
+    API -->|answer + sources| UI
+  end
+```
+
+The index is built once offline; every question is served online by retrieving
+from Qdrant, reranking with a cross-encoder, then generating a grounded answer
+with a local Ollama model. See [ADR 0001](docs/adr/0001-retrieval-strategy.md)
+(retrieval) and [ADR 0002](docs/adr/0002-generation-model.md) (generation).
 
 ---
 
@@ -131,9 +160,6 @@ No external inference provider.
 docker compose up -d qdrant
 ollama pull granite4.1:8b
 
-# index the served collection once, if not already: docling_hybrid_1024_bge-m3
-make index CONFIG=configs/index/docling_hybrid_1024.yaml
-
 # serve the API + the UI (two terminals)
 make serve        # FastAPI on :8000  — GET /health, POST /ask, GET /options
 make demo         # Gradio UI on :7860  -> open http://localhost:7860
@@ -147,6 +173,10 @@ The LLM, retrieval depth `k` and Qdrant collection are picked in the UI (or per
 request in `/ask`); the default is `granite4.1:8b` at k10 (ADR 0002), set by the
 `RAG_CONFIG` env var. Retrieval models run on the host GPU; on an 8 GB card the
 generator falls back to CPU when both compete for VRAM.
+
+<!-- Demo GIF — record the UI (see docs/checklists) and uncomment:
+![RAG demo](docs/assets/demo.gif)
+-->
 
 ---
 
