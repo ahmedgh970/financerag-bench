@@ -114,11 +114,39 @@ make index CONFIG=configs/index/docling_hybrid_512.yaml
 # 4. Evaluate retrieval quality
 make eval CONFIG=configs/eval/hybrid512_reranked_dense.yaml
 
-# 5. Generate answers with the RAG pipeline (needs an LLM: GROQ_API_KEY, or a
-#    local Ollama via a configs/rag/*_ollama.yaml config)
-make answer CONFIG=configs/rag/naive_reranked_dense_512_k10_llama70b.yaml                            # all 150 QA
-make answer CONFIG=configs/rag/naive_reranked_dense_512_k10_llama70b.yaml ID=financebench_id_03029  # one QA
+# 5. Generate answers with the RAG pipeline (local Ollama, no quota)
+make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml                            # all 150 QA
+make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml ID=financebench_id_03029  # one QA
 ```
+
+---
+
+## Run the demo locally
+
+Everything is local — Qdrant in Docker, the API / UI / LLM on the host (GPU).
+No external inference provider.
+
+```bash
+# vector DB (Docker) + the served generator
+docker compose up -d qdrant
+ollama pull granite4.1:8b
+
+# index the served collection once, if not already: docling_hybrid_1024_bge-m3
+make index CONFIG=configs/index/docling_hybrid_1024.yaml
+
+# serve the API + the UI (two terminals)
+make serve        # FastAPI on :8000  — GET /health, POST /ask, GET /options
+make demo         # Gradio UI on :7860  -> open http://localhost:7860
+
+# or query the API directly
+curl -s -X POST localhost:8000/ask -H 'Content-Type: application/json' \
+  -d '{"question":"What was 3M FY2018 capital expenditure?","doc_id":"3M_2018_10K"}'
+```
+
+The LLM, retrieval depth `k` and Qdrant collection are picked in the UI (or per
+request in `/ask`); the default is `granite4.1:8b` at k10 (ADR 0002), set by the
+`RAG_CONFIG` env var. Retrieval models run on the host GPU; on an 8 GB card the
+generator falls back to CPU when both compete for VRAM.
 
 ---
 
