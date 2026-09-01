@@ -1555,6 +1555,11 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+agents = [
+    { name = "langchain-core" },
+    { name = "langchain-ollama" },
+    { name = "langgraph" },
+]
 dashboard = [
     { name = "plotly" },
     { name = "streamlit" },
@@ -1592,8 +1597,11 @@ requires-dist = [
     { name = "gradio", marker = "extra == 'demo'", specifier = ">=4.36.0" },
     { name = "langchain", specifier = ">=0.2.0,<1.0" },
     { name = "langchain-community", specifier = ">=0.2.0,<0.4" },
+    { name = "langchain-core", marker = "extra == 'agents'", specifier = ">=0.3.86" },
+    { name = "langchain-ollama", marker = "extra == 'agents'", specifier = ">=0.3.10" },
     { name = "langfuse", specifier = ">=2.0.0" },
     { name = "langgraph", specifier = ">=0.1.0,<1.0" },
+    { name = "langgraph", marker = "extra == 'agents'", specifier = ">=0.6.11" },
     { name = "matplotlib", marker = "extra == 'dev'", specifier = ">=3.8.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.10.0" },
     { name = "onnxruntime-gpu", marker = "extra == 'ingestion'", specifier = "==1.26.0" },
@@ -1622,7 +1630,7 @@ requires-dist = [
     { name = "unstructured", extras = ["pdf"], marker = "extra == 'ingestion'", specifier = ">=0.21.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.30.0" },
 ]
-provides-extras = ["ingestion", "dev", "dashboard", "demo"]
+provides-extras = ["ingestion", "dev", "dashboard", "demo", "agents"]
 
 [package.metadata.requires-dev]
 dev = [{ name = "ipykernel", specifier = ">=7.3.0" }]
@@ -2805,6 +2813,19 @@ wheels = [
 ]
 
 [[package]]
+name = "langchain-ollama"
+version = "0.3.10"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "langchain-core" },
+    { name = "ollama" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/73/c9/ff996fc5fa2d8d23136f07c56e88a1013fe1e03a35ef3e65899baa73c49e/langchain_ollama-0.3.10.tar.gz", hash = "sha256:5d942d331c44351bae5c5c5965603ceb20b0ee4d70082290f4b15bc638559756", size = 35771, upload-time = "2025-10-02T15:53:20.974Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4b/f2/d87767a106021206fb53faf7ae4517d365d353dc29a1649b9f3e47eef940/langchain_ollama-0.3.10-py3-none-any.whl", hash = "sha256:7550792872e8f86d362568e9ceb0f8085428bc59946c7b44e726358ba4b280f9", size = 27646, upload-time = "2025-10-02T15:53:19.89Z" },
+]
+
+[[package]]
 name = "langchain-openai"
 version = "0.3.35"
 source = { registry = "https://pypi.org/simple" }
@@ -3940,6 +3961,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/69/1b/077b508e3e500e1629d366249c3ccb32f95e50258b231705c09e3c7a4366/olefile-0.47.zip", hash = "sha256:599383381a0bf3dfbd932ca0ca6515acd174ed48870cbf7fee123d698c192c1c", size = 112240, upload-time = "2023-12-01T16:22:53.025Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/17/d3/b64c356a907242d719fc668b71befd73324e47ab46c8ebbbede252c154b2/olefile-0.47-py2.py3-none-any.whl", hash = "sha256:543c7da2a7adadf21214938bb79c83ea12b473a4b6ee4ad4bf854e7715e13d1f", size = 114565, upload-time = "2023-12-01T16:22:51.518Z" },
+]
+
+[[package]]
+name = "ollama"
+version = "0.6.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/fc/72/5f12423b6b39ca8430fbe56f77fcf4ef60f63067c7c4a2e30e200ed9ec16/ollama-0.6.2.tar.gz", hash = "sha256:936d55daa684f474364c098611c933626f8d6c7d67065c5b7ae0c477b508b07f", size = 53145, upload-time = "2026-04-29T21:21:15.018Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/c4/ab/d6722beeb2d10f7a3b9ff49375708904fde18f82b5609a0bc4aeb5996a4d/ollama-0.6.2-py3-none-any.whl", hash = "sha256:3ad7daab28e5a973445c36a73882a3ef698c2ebb00e21e308652741577509f7d", size = 15115, upload-time = "2026-04-29T21:21:13.794Z" },
 ]
 
 [[package]]

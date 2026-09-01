@@ -65,6 +65,11 @@ dashboard = [
 demo = [
     "gradio>=4.36.0",
 ]
+agents = [
+    "langchain-core>=0.3.86",
+    "langchain-ollama>=0.3.10",
+    "langgraph>=0.6.11",
+]
 
 # Pin torch to a CUDA 12.1 build: compatible with onnxruntime-gpu (CUDA 12) and
 # with both target drivers (local CUDA 13, server CUDA 12.2). Drop the CPU
