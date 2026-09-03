@@ -7,7 +7,7 @@ help:
 	@echo "financerag-bench — available commands:"
 	@echo ""
 	@echo "  make install        Install runtime (deployable) dependencies only"
-	@echo "  make install-all    Install every extra (ingestion, dev, dashboard, demo) + pre-commit"
+	@echo "  make install-all    Install every extra (ingestion, dev, dashboard, demo, agents) + pre-commit"
 	@echo "  make lint           Run ruff lint"
 	@echo "  make format         Run ruff format"
 	@echo "  make test           Run all tests"
@@ -25,7 +25,7 @@ help:
 	@echo "  make chunk-dist     Plot real chunk-size distribution per budget -> docs/adr/assets/ (needs install-all)"
 	@echo "  make serve          Start FastAPI server"
 	@echo "  make demo           Start the Gradio demo UI (needs make serve running)"
-	@echo "  make docker-up      Start Docker services (Qdrant, Langfuse)"
+	@echo "  make docker-up      Start Docker services (Qdrant, Phoenix)"
 	@echo "  make docker-down    Stop Docker services"
 	@echo "  make clean          Remove generated artefacts"
 
@@ -33,7 +33,7 @@ install:
 	uv sync
 
 install-all:
-	uv sync --extra ingestion --extra dev --extra dashboard --extra demo
+	uv sync --extra ingestion --extra dashboard --extra demo --extra agents
 	uv run pre-commit install
 
 lint:
@@ -44,10 +44,10 @@ format:
 	uv run ruff check --fix src/ tests/
 
 test:
-	uv run --extra ingestion --extra dev pytest tests/ -v
+	uv run --extra ingestion pytest tests/ -v
 
 test-fast:
-	uv run --extra dev pytest tests/ -v -m "not slow and not eval"
+	uv run pytest tests/ -v -m "not slow and not eval"
 
 parse:
 	uv run --extra ingestion python -m src.ingestion.runner parse --config $(CONFIG)

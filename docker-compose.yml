@@ -10,36 +10,14 @@ services:
       QDRANT__SERVICE__GRPC_PORT: 6334
     restart: unless-stopped
 
-  langfuse-server:
-    image: langfuse/langfuse:2
+  # Local LLM/agent tracing UI + OTLP collector (no account, all local).
+  # UI at http://localhost:6006 ; the app exports spans to it via OTLP.
+  phoenix:
+    image: arizephoenix/phoenix:latest
     ports:
-      - "3000:3000"
-    environment:
-      DATABASE_URL: postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
-      NEXTAUTH_SECRET: change-me-in-production
-      SALT: change-me-in-production
-      NEXTAUTH_URL: http://localhost:3000
-      TELEMETRY_ENABLED: "false"
-    depends_on:
-      langfuse-db:
-        condition: service_healthy
-    restart: unless-stopped
-
-  langfuse-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: langfuse
-      POSTGRES_PASSWORD: langfuse
-      POSTGRES_DB: langfuse
-    volumes:
-      - langfuse_postgres:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U langfuse"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - "6006:6006"  # UI + OTLP over HTTP (/v1/traces)
+      - "4317:4317"  # OTLP over gRPC
     restart: unless-stopped
 
 volumes:
   qdrant_data:
-  langfuse_postgres:

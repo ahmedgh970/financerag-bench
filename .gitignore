@@ -13,7 +13,7 @@ data/processed/
 benchmarks/*.json
 benchmarks/*.csv
 !benchmarks/.gitkeep
-langfuse.db
+.phoenix/
 .cache/huggingface/
 
 # Byte-compiled / optimized / DLL files
