@@ -15,7 +15,7 @@ FinanceBench shows that state-of-the-art RAG systems fail on ~80% of financial q
 - Reproducible evaluation pipeline (retrieval metrics + LLM judge + Ragas)
 - Progression: naive RAG → hybrid search + reranking → agentic RAG → multi-agent
 - Multi-LLM open-source benchmark (quality / latency / cost)
-- Production patterns: observability (Langfuse), CI with eval regression, FastAPI serving
+- Production patterns: observability (Phoenix), CI with eval regression, FastAPI serving
 
 ---
 
@@ -129,7 +129,7 @@ too slow to be practical. All other models cover the full `k = 5 / 10 / 20`.
 ## Quickstart
 
 ```bash
-# 1. Start services (Qdrant + Langfuse)
+# 1. Start services (Qdrant + Phoenix)
 docker compose up -d
 
 # 2. Install dependencies
@@ -210,7 +210,7 @@ financerag-bench/
 ├── dashboard/                     # Streamlit benchmark explorer
 ├── tests/                         # pytest (unit + integration + eval regression)
 ├── .github/workflows/             # CI: lint, format check, fast tests
-├── docker-compose.yml             # Qdrant + Langfuse
+├── docker-compose.yml             # Qdrant + Phoenix
 └── Makefile                       # make parse / chunk / index / eval / answer / serve
 ```
 
@@ -229,6 +229,6 @@ financerag-bench/
 | PDF parsing | Docling |
 | Embeddings | BGE-M3 |
 | Evaluation | Ragas + custom retrieval metrics + LLM as a judge |
-| Observability | Langfuse |
+| Observability | Arize Phoenix (local) |
 | API | FastAPI |
 | CI/CD | GitHub Actions |

@@ -30,7 +30,6 @@ dependencies = [
     "fastapi>=0.111.0",
     "uvicorn[standard]>=0.30.0",
     # Observability
-    "langfuse>=2.0.0",
     # Config
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0",
@@ -50,14 +49,6 @@ ingestion = [
     "unstructured[pdf]>=0.21.5",
     "onnxruntime-gpu==1.26.0",
 ]
-dev = [
-    "pytest>=8.0.0",
-    "pytest-asyncio>=0.23.0",
-    "ruff>=0.4.0",
-    "mypy>=1.10.0",
-    "pre-commit>=3.7.0",
-    "matplotlib>=3.8.0",  # analysis/reporting scripts (scripts/)
-]
 dashboard = [
     "streamlit>=1.35.0",
     "plotly>=5.22.0",
@@ -66,9 +57,11 @@ demo = [
     "gradio>=4.36.0",
 ]
 agents = [
+    "arize-phoenix-otel>=0.17.1",
     "langchain-core>=0.3.86",
     "langchain-ollama>=0.3.10",
     "langgraph>=0.6.11",
+    "openinference-instrumentation-langchain>=0.1.73",
 ]
 
 # Pin torch to a CUDA 12.1 build: compatible with onnxruntime-gpu (CUDA 12) and
@@ -117,6 +110,15 @@ markers = [
 ]
 
 [dependency-groups]
+# Installed by default by uv (a bare `uv run` / `uv sync` includes it), so this
+# dev tooling is never pruned -- unlike an optional extra. Keeps the pre-commit
+# hook, linters and test runner always present in the venv. pytest itself is a
+# core dependency above.
 dev = [
     "ipykernel>=7.3.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+    "pre-commit>=3.7.0",
+    "matplotlib>=3.8.0",  # analysis/reporting scripts (scripts/)
 ]
