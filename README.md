@@ -185,7 +185,7 @@ generator falls back to CPU when both compete for VRAM.
 ```
 financerag-bench/
 ├── README.md
-├── docs/                          # ADRs, benchmark reports
+├── docs/                          # ADRs (tracked); measurement dumps kept local
 ├── configs/                       # 1 YAML = 1 reproducible experiment, grouped by stage
 │   ├── parse/
 │   ├── chunk/
@@ -206,7 +206,6 @@ financerag-bench/
 │   ├── agents/                    # LangGraph: router, grader, rewriter
 │   ├── evaluation/                # retrieval metrics + Ragas + runner
 │   └── api/                       # FastAPI
-├── benchmarks/                    # results (JSON/CSV) versioned
 ├── dashboard/                     # Streamlit benchmark explorer
 ├── tests/                         # pytest (unit + integration + eval regression)
 ├── .github/workflows/             # CI: lint, format check, fast tests
