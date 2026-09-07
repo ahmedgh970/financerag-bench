@@ -3,7 +3,7 @@
 For each QA it resolves the gold evidence to physical pages, retrieves the top-k
 chunks, marks which are relevant (on a gold page, deduplicated per page) and
 computes recall@k / precision@k / MRR / nDCG@k. Results are averaged over the QAs
-whose document is present in the indexed corpus and saved to ``benchmarks/``.
+whose document is present in the indexed corpus and saved to ``docs/benchmarks/``.
 
 Usage:
     python -m src.evaluation.runner --config configs/eval_hybrid512_dense.yaml
@@ -103,7 +103,7 @@ def _aggregate(per_qa: list[dict[str, float]]) -> dict[str, float]:
 
 
 def _save_report(report: dict, collection: str) -> None:
-    out_dir = Path("benchmarks")
+    out_dir = Path("docs/benchmarks")
     out_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     out = out_dir / f"eval_{collection}_{stamp}.json"

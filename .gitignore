@@ -1,6 +1,7 @@
 # Learning docs
 docs/*.md
 docs/checklists
+docs/benchmarks
 CLAUDE.md
 
 # Project-specific
@@ -10,9 +11,6 @@ notebooks/
 data/fewpdfs/
 data/vectorstores/
 data/processed/
-benchmarks/*.json
-benchmarks/*.csv
-!benchmarks/.gitkeep
 .phoenix/
 .cache/huggingface/
 
