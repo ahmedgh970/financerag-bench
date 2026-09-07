@@ -1,0 +1,24 @@
+# Ablation row: dense k=20 -> grade -> [correct] -> generate.
+# Differs from advanced.yaml by the grading switch alone.
+#
+# Grading keeps ~2.7 chunks out of 20, so the generation prompt drops roughly
+# sevenfold (measured: 47k -> 6.3k characters median, 12k tokens at the maximum).
+# 12288 therefore covers every filtered prompt observed over the 150 questions, and
+# keeps the model within reach of the GPU -- a real benefit of filtering, not an
+# artefact. The give-up path trims its passages to fit this same window.
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+collection_name: docling_hybrid_1024_bge-m3
+retriever: dense
+doc_scoped: true
+k: 20
+grading:
+  enabled: true
+  mode: per_chunk
+calculator:
+  enabled: false
+max_rewrites: 2
+llm:
+  model: ollama_chat/granite4.1:8b
+  temperature: 0.0
+  max_tokens: 1024
+  num_ctx: 12288
