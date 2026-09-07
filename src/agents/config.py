@@ -22,6 +22,7 @@ class AgentConfig(RagConfig):
     depths: tuple[int, ...] = (5, 10, 20)
     num_ctx: int = 32768
     recursion_limit: int = 12
+    prompt_version: str = "v1"
 
 
 def load_agent_config(path: str) -> AgentConfig:

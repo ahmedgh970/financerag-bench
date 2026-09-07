@@ -16,23 +16,12 @@ from langchain_ollama import ChatOllama
 from langgraph.errors import GraphRecursionError
 from langgraph.prebuilt import create_react_agent
 
+from src.agents.prompts import get_prompt
 from src.agents.tools import build_retrieve_tool, calculator
 from src.ingestion.schema import Chunk
 from src.llm.client import _model_name
 from src.llm.config import LLMConfig
 from src.retrieval.base import Retriever
-
-_SYSTEM_PROMPT = """You are a financial analyst assistant answering a question about a single SEC filing.
-
-You have two tools:
-- `retrieve`: search the filing for relevant passages. Each call searches DEEPER
-  than the last (more passages). Start with one search; if the passages you have
-  are not enough to answer, search again to go deeper -- at most 3 searches.
-- `calculator`: use it for ANY arithmetic instead of computing it yourself.
-
-Answer using ONLY the retrieved passages. State the exact figure with its unit
-(e.g. "$1,577 million", "12.4%") and cite the source pages. If the passages do
-not contain the answer, say so explicitly instead of guessing."""
 
 
 @dataclass
@@ -55,13 +44,15 @@ def answer_agentic(
     depths: tuple[int, ...] = (5, 10, 20),
     num_ctx: int = 32768,
     recursion_limit: int = 12,
+    prompt_version: str = "v1",
 ) -> AgentAnswer:
     """Answer ``question`` with a depth-escalating tool-using LangGraph agent.
 
     ``retriever`` should be dense-only (no reranker): the agent itself filters the
     passages, and the escalating ``depths`` (5 → 10 → 20) let it start cheap and
     go deeper only when needed. ``num_ctx`` is large because the passages of every
-    depth accumulate in the agent's context.
+    depth accumulate in the agent's context. ``prompt_version`` selects the system
+    prompt from :mod:`src.agents.prompts`.
     """
     sink: list[Chunk] = []
     tools = [build_retrieve_tool(retriever, doc_id=doc_id, depths=depths, sink=sink), calculator]
@@ -71,7 +62,7 @@ def answer_agentic(
         num_ctx=num_ctx,
         num_predict=llm_config.max_tokens,
     )
-    agent = create_react_agent(llm, tools, prompt=_SYSTEM_PROMPT)
+    agent = create_react_agent(llm, tools, prompt=get_prompt(prompt_version))
 
     start = time.perf_counter()
     try:

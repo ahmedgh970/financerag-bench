@@ -47,16 +47,18 @@ def _select(qas: list[QAItem], qa_id: str | None) -> list[QAItem]:
 
 
 def _output_path(config: AgentConfig) -> Path:
-    """Where answers are written: one file per (retriever, corpus, LLM, depths).
+    """Where answers are written: one file per (retriever, corpus, LLM, depths, prompt).
 
-    ``agent_`` prefix and the escalating depths distinguish these from the naive
-    runner's files, so the resume logic never mixes the two.
+    The ``agent_`` prefix and the escalating depths distinguish these from the naive
+    runner's files, so the resume logic never mixes the two; the prompt version is
+    encoded too, so prompt variants are separate experiments rather than overwrites.
     """
     model = config.llm.model.replace("/", "_")
     depths = "-".join(map(str, config.depths))
     return (
         Path("data/processed/answers")
-        / f"agent_{config.retriever}_{config.collection_name}_{model}_d{depths}.jsonl"
+        / f"agent_{config.retriever}_{config.collection_name}_{model}"
+        f"_d{depths}_{config.prompt_version}.jsonl"
     )
 
 
@@ -95,6 +97,7 @@ def run(
                 depths=config.depths,
                 num_ctx=config.num_ctx,
                 recursion_limit=config.recursion_limit,
+                prompt_version=config.prompt_version,
             )
             record = {
                 "id": qa.id,
@@ -126,8 +129,12 @@ def main() -> None:
     parser.add_argument(
         "--trace", action="store_true", help="Export the agent loop to local Phoenix."
     )
+    parser.add_argument("--prompt", help="Override the config's prompt_version (e.g. v2).")
     args = parser.parse_args()
-    run(load_agent_config(args.config), qa_id=args.id, limit=args.limit, trace=args.trace)
+    config = load_agent_config(args.config)
+    if args.prompt:
+        config = config.model_copy(update={"prompt_version": args.prompt})
+    run(config, qa_id=args.id, limit=args.limit, trace=args.trace)
 
 
 if __name__ == "__main__":
