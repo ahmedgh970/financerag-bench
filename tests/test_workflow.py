@@ -31,10 +31,22 @@ def _config(**overrides) -> WorkflowConfig:
         "chunks_path": "unused.jsonl",
         "collection_name": "test_collection",
         "retriever": "reranked",
-        "k": 3,
+        "k": 5,
         "doc_scoped": True,
     }
     return WorkflowConfig(**{**base, **overrides})
+
+
+def _patch_llm(monkeypatch, grades: list[int], answer: str = "generated answer"):
+    """Stub the LLM: one graded verdict per passage, then the generation call."""
+    from src.workflow.schemas import ChunkGrade
+
+    verdicts = iter(grades)
+    monkeypatch.setattr(
+        "src.workflow.nodes.generate_structured",
+        lambda prompt, config, model: ChunkGrade(grade=next(verdicts)),
+    )
+    monkeypatch.setattr("src.workflow.nodes.generate", lambda prompt, config: answer)
 
 
 def test_variant_name_covers_the_ablation_matrix():
@@ -47,15 +59,17 @@ def test_variant_name_covers_the_ablation_matrix():
     )
 
 
-def test_baseline_config_yaml_loads_and_is_the_advanced_cell():
-    config = load_workflow_config("configs/workflow/advanced.yaml")
-    assert variant_name(config) == "advanced"
-    assert config.grading.enabled is False and config.calculator.enabled is False
-    assert config.max_rewrites == 2
+def test_shipped_configs_load_and_select_distinct_cells():
+    advanced = load_workflow_config("configs/workflow/advanced.yaml")
+    grading = load_workflow_config("configs/workflow/grading.yaml")
+    control = load_workflow_config("configs/workflow/control_top3.yaml")
+    assert variant_name(advanced) == "advanced" and advanced.retriever == "dense"
+    assert variant_name(grading) == "grading" and grading.grading.min_chunks == 3
+    # The control row is the floor without the grader: top-3, no grading.
+    assert variant_name(control) == "advanced" and control.k == 3
 
 
-def test_disabled_nodes_reduce_the_graph_to_retrieve_then_generate(monkeypatch):
-    """With both switches off the graph must behave exactly like the naive pipeline."""
+def test_disabled_grading_reduces_the_graph_to_retrieve_then_generate(monkeypatch):
     captured: dict[str, str] = {}
 
     def fake_generate(prompt, config):
@@ -63,120 +77,68 @@ def test_disabled_nodes_reduce_the_graph_to_retrieve_then_generate(monkeypatch):
         return "generated answer"
 
     monkeypatch.setattr("src.workflow.nodes.generate", fake_generate)
+    monkeypatch.setattr(
+        "src.workflow.nodes.generate_structured",
+        lambda *a, **k: pytest.fail("grading is off, the grader must not be called"),
+    )
 
     retriever = FakeRetriever([_chunk(i) for i in range(5)])
-    result = answer_workflow("What was capex?", retriever, _config(), doc_id="DOC_2022_10K")
+    result = answer_workflow("What was capex?", retriever, _config(k=3), doc_id="DOC_2022_10K")
 
-    assert result.answer == "generated answer"
-    assert [c.chunk_id for c in result.sources] == ["c0", "c1", "c2"]  # k=3
-    assert retriever.calls == [("What was capex?", 3, "DOC_2022_10K")]
-    assert result.llm_calls == 1
-    # No correction loop ran.
-    assert result.n_rewrites == 0 and result.bound_hit is False
-    # Every retrieved chunk reached the prompt.
-    assert "passage 2" in captured["prompt"]
-    assert "retrieve" in result.node_latencies and "generate" in result.node_latencies
-
-
-def test_unknown_prompt_free_config_rejects_bad_grading_mode():
-    with pytest.raises(ValueError):
-        _config(grading={"enabled": True, "mode": "nonsense"})
-
-
-# --- grading + correction loop ------------------------------------------------
-
-
-def _patch_llm(monkeypatch, grades: list[list[bool]], answer: str = "generated answer"):
-    """Stub the LLM calls: per-chunk grading yields one boolean per call, in order."""
-    verdicts = iter([flag for round_ in grades for flag in round_])
-
-    def fake_structured(prompt, config, model):
-        return model(relevant=next(verdicts))
-
-    monkeypatch.setattr("src.workflow.nodes.generate_structured", fake_structured)
-    monkeypatch.setattr("src.workflow.nodes.generate", lambda prompt, config: answer)
-
-
-def test_grading_keeps_only_relevant_chunks_and_skips_the_rewrite(monkeypatch):
-    _patch_llm(monkeypatch, grades=[[True, False, True]])
-    retriever = FakeRetriever([_chunk(i) for i in range(3)])
-    config = _config(grading={"enabled": True})
-
-    result = answer_workflow("q", retriever, config, doc_id="DOC_2022_10K")
-
-    assert [c.chunk_id for c in result.sources] == ["c0", "c2"]
-    assert result.n_rewrites == 0 and result.bound_hit is False
-    assert len(retriever.calls) == 1  # relevant chunks found -> no reformulation
-
-
-def test_zero_relevant_triggers_rewrites_up_to_the_configured_bound(monkeypatch):
-    # Never relevant: the loop must stop after max_rewrites and fall back.
-    _patch_llm(monkeypatch, grades=[[False] * 3] * 5)
-    retriever = FakeRetriever([_chunk(i) for i in range(3)])
-    config = _config(grading={"enabled": True}, max_rewrites=2)
-
-    result = answer_workflow("q", retriever, config, doc_id="DOC_2022_10K")
-
-    assert result.n_rewrites == 2
-    assert result.bound_hit is True
-    assert len(retriever.calls) == 3  # initial + 2 rewrites
-    # Fallback serves the FIRST round's chunks, so the path degenerates to baseline.
     assert [c.chunk_id for c in result.sources] == ["c0", "c1", "c2"]
+    assert result.llm_calls == 1 and result.n_kept_by_grade == 0
+    assert "passage 2" in captured["prompt"]
 
 
-def test_rewrite_bound_is_read_from_config_not_hardcoded(monkeypatch):
-    _patch_llm(monkeypatch, grades=[[False] * 3] * 8)
-    retriever = FakeRetriever([_chunk(i) for i in range(3)])
+def test_grading_keeps_passages_at_or_above_the_threshold(monkeypatch):
+    _patch_llm(monkeypatch, grades=[3, 0, 2, 1, 0])
+    retriever = FakeRetriever([_chunk(i) for i in range(5)])
+    config = _config(k=5, grading={"enabled": True, "keep_threshold": 2, "min_chunks": 0})
 
-    result = answer_workflow(
-        "q", retriever, _config(grading={"enabled": True}, max_rewrites=0), doc_id="DOC_2022_10K"
-    )
-    assert result.n_rewrites == 0 and result.bound_hit is True
+    result = answer_workflow("q", retriever, config, doc_id="DOC_2022_10K")
 
-    retriever2 = FakeRetriever([_chunk(i) for i in range(3)])
-    _patch_llm(monkeypatch, grades=[[False] * 3] * 8)
-    result2 = answer_workflow(
-        "q", retriever2, _config(grading={"enabled": True}, max_rewrites=3), doc_id="DOC_2022_10K"
-    )
-    assert result2.n_rewrites == 3
+    assert [c.chunk_id for c in result.sources] == ["c0", "c2"]  # grades 3 and 2
+    assert result.n_kept_by_grade == 2 and result.n_kept_by_floor == 0
+    assert result.grades == [3, 0, 2, 1, 0]  # recorded for offline calibration
+    assert result.max_grade == 3 and result.low_confidence is False
+    assert result.llm_calls == 6  # five gradings plus the generation
 
 
-def test_grader_failure_fails_open_rather_than_faking_a_retrieval_failure(monkeypatch):
-    from src.llm.client import StructuredOutputError
+def test_floor_tops_up_without_ever_duplicating_a_kept_passage(monkeypatch):
+    """The kept passage is also top-ranked: the floor must skip it, not re-add it."""
+    _patch_llm(monkeypatch, grades=[3, 0, 0, 0, 0])  # only c0 kept, and c0 ranks first
+    retriever = FakeRetriever([_chunk(i) for i in range(5)])
+    config = _config(k=5, grading={"enabled": True, "min_chunks": 3})
 
-    def boom(prompt, config, model):
-        raise StructuredOutputError("bad json")
+    result = answer_workflow("q", retriever, config, doc_id="DOC_2022_10K")
 
-    monkeypatch.setattr("src.workflow.nodes.generate_structured", boom)
-    monkeypatch.setattr("src.workflow.nodes.generate", lambda prompt, config: "answer")
-
-    retriever = FakeRetriever([_chunk(i) for i in range(3)])
-    result = answer_workflow(
-        "q", retriever, _config(grading={"enabled": True}), doc_id="DOC_2022_10K"
-    )
-
-    assert result.grader_errors == 3  # one failure per chunk, in per_chunk mode
-    assert len(result.sources) == 3  # every chunk kept
-    assert result.n_rewrites == 0  # and no needless reformulation
+    ids = [c.chunk_id for c in result.sources]
+    assert ids == ["c0", "c1", "c2"]  # c0 once, then the next best two
+    assert len(ids) == len(set(ids)) == 3
+    assert result.n_kept_by_grade == 1 and result.n_kept_by_floor == 2
 
 
-def test_fallback_cap_is_derived_from_num_ctx_not_a_fixed_count(monkeypatch):
-    """The give-up path trims passages to fit the pinned context, from the END.
+def test_min_chunks_expresses_the_floor_policy(monkeypatch):
+    """0 disables the floor, 1 only rescues an empty selection, 3 always guarantees three."""
 
-    Ollama truncates from the top, which would drop the grounding instructions and
-    the best-ranked passages; trimming here keeps both. How many survive must follow
-    the configured context, so a larger num_ctx keeps strictly more.
-    """
-    _patch_llm(monkeypatch, grades=[[False] * 6] * 6)
-
-    def kept_with(num_ctx):
-        retriever = FakeRetriever([_chunk(i) for i in range(6)])
-        config = _config(k=6, grading={"enabled": True}, max_rewrites=0)
-        config.llm.num_ctx = num_ctx
-        config.llm.max_tokens = 16
+    def kept_with(minimum, grades):
+        _patch_llm(monkeypatch, grades=grades)
+        retriever = FakeRetriever([_chunk(i) for i in range(5)])
+        config = _config(k=5, grading={"enabled": True, "min_chunks": minimum})
         return [c.chunk_id for c in answer_workflow("q", retriever, config).sources]
 
-    tight, roomy = kept_with(2048), kept_with(32768)
-    assert tight == ["c0", "c1", "c2", "c3", "c4", "c5"][: len(tight)]  # trimmed from the END
-    assert len(roomy) == 6  # everything fits
-    assert len(tight) <= len(roomy)
+    assert kept_with(0, [0, 0, 0, 0, 0]) == []  # no floor: an empty context is allowed
+    assert kept_with(1, [0, 0, 0, 0, 0]) == ["c0"]  # rescue only
+    assert kept_with(1, [3, 0, 0, 0, 0]) == ["c0"]  # already non-empty, floor idle
+    assert kept_with(3, [0, 0, 0, 0, 0]) == ["c0", "c1", "c2"]
+
+
+def test_context_follows_the_retriever_ranking_whatever_the_provenance(monkeypatch):
+    """A late passage kept by the grader must not jump ahead of earlier floor passages."""
+    _patch_llm(monkeypatch, grades=[0, 0, 0, 0, 3])  # only the last-ranked passage kept
+    retriever = FakeRetriever([_chunk(i) for i in range(5)])
+    config = _config(k=5, grading={"enabled": True, "min_chunks": 3})
+
+    ids = [c.chunk_id for c in answer_workflow("q", retriever, config).sources]
+
+    assert ids == ["c0", "c1", "c4"]  # ranking order, not selection order

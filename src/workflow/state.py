@@ -20,24 +20,21 @@ class CragState(TypedDict, total=False):
     question: str
     doc_id: str | None
 
-    # Retrieval
-    query: str  # the current query -- rewritten by the correction loop
+    # Retrieval -- ``chunks`` arrives in the retriever's own order (cross-encoder
+    # order when the retriever reranks), which is also the order the floor draws from.
     chunks: list[Chunk]
     scores: list[float]
-    initial_chunks: list[Chunk]  # first round, kept as the give-up fallback
-    tried_queries: list[str]
 
-    # Grading / correction loop
-    graded: list[Chunk]  # chunks kept by the grader; unset when grading is off
-    kept_per_round: list[int]  # chunks kept at each grading round, to see if a rewrite paid off
-    rewrites: int
-    bound_hit: bool  # the rewrite budget ran out; we fall back instead of refusing
-    grader_errors: int
+    # Grading
+    graded: list[Chunk]  # the context; unset when grading is off
+    grades: list[int]  # one 0-3 grade per retrieved chunk, kept for offline calibration
+    n_kept_by_grade: int  # passed the threshold on their own merit
+    n_kept_by_floor: int  # added by the floor to reach min_chunks
+    max_grade: int
+    low_confidence: bool  # recorded, never acted upon
 
     # Numeric path
     is_numeric: bool
-    formula_name: str | None
-    expression: str | None
     computed: str | None
 
     # Output

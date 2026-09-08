@@ -1,30 +1,20 @@
 """The graph's nodes. Each returns the slice of state it owns; the graph routes.
 
-Every node here either fetches, judges or generates -- none of them chooses what
-runs next. Routing lives in the conditional-edge functions at the bottom, which
-read a judgement out of the state and return the name of the next node. That split
-is what makes this a workflow rather than an agent.
+Every node here either fetches, judges or generates -- none of them chooses what runs
+next. That split is what makes this a workflow rather than an agent.
 """
 
 from __future__ import annotations
 
 import time
 
-from src.llm.client import (
-    StructuredOutputError,
-    estimated_context,
-    generate,
-    generate_structured,
-)
+from src.ingestion.schema import Chunk
+from src.llm.client import StructuredOutputError, generate, generate_structured
 from src.llm.prompts import build_prompt
 from src.retrieval.base import Retriever
 from src.workflow.config import WorkflowConfig
-from src.workflow.prompts import (
-    build_grading_prompt,
-    build_rewrite_prompt,
-    build_single_grading_prompt,
-)
-from src.workflow.schemas import BatchGrades, ChunkGrade
+from src.workflow.prompts import build_grading_prompt
+from src.workflow.schemas import ChunkGrade
 from src.workflow.state import CragState
 
 
@@ -34,139 +24,88 @@ def _timed(state: CragState, node: str, started: float) -> dict[str, float]:
 
 
 def make_retrieve(retriever: Retriever, config: WorkflowConfig):
-    """Fetch the top-k passages for the current query."""
+    """Fetch the top-k passages. Their order is the retriever's own ranking."""
 
     def retrieve(state: CragState) -> dict:
         started = time.perf_counter()
-        query = state.get("query") or state["question"]
-        results = retriever.retrieve(query, k=config.k, doc_id=state.get("doc_id"))
-        chunks = [sc.chunk for sc in results]
-        out = {
-            "chunks": chunks,
+        results = retriever.retrieve(state["question"], k=config.k, doc_id=state.get("doc_id"))
+        return {
+            "chunks": [sc.chunk for sc in results],
             "scores": [sc.score for sc in results],
-            "tried_queries": [*state.get("tried_queries", []), query],
             "node_latencies": _timed(state, "retrieve", started),
         }
-        # The first round is kept untouched: it is what the give-up path falls back
-        # to, so that path degenerates exactly to the baseline and can never do worse.
-        if not state.get("initial_chunks"):
-            out["initial_chunks"] = chunks
-        return out
 
     return retrieve
 
 
+def _apply_floor(kept: list[Chunk], ranked: list[Chunk], minimum: int) -> list[Chunk]:
+    """Top a thin selection up to ``minimum`` with the best passages it does not hold.
+
+    Walks the retriever's ranking and skips anything already kept, so a passage the
+    grader selected is never added twice -- a duplicate would appear under two source
+    numbers in the prompt and read as two independent pieces of evidence.
+    """
+    if len(kept) >= minimum:
+        return kept
+    seen = {c.chunk_id for c in kept}
+    topped = list(kept)
+    for chunk in ranked:
+        if chunk.chunk_id in seen:
+            continue
+        topped.append(chunk)
+        seen.add(chunk.chunk_id)
+        if len(topped) >= minimum:
+            break
+    return topped
+
+
 def make_grade(config: WorkflowConfig):
-    """Judge each passage's relevance -- absolutely, unlike the reranker's ordering."""
+    """Grade every passage 0-3, keep those above the threshold, top up to the floor.
+
+    One call per passage. Grading twenty passages in a single prompt was implemented
+    first and measured unusable: asked for twenty verdicts at once the model returned
+    one, and rejected everything. One passage per call makes the miscount structurally
+    impossible, at the cost of k calls.
+    """
+    grading = config.grading
 
     def grade(state: CragState) -> dict:
         started = time.perf_counter()
         chunks = state.get("chunks", [])
-        rounds = state.get("kept_per_round", [])
         if not chunks:
-            return {
-                "graded": [],
-                "kept_per_round": [*rounds, 0],
-                "node_latencies": _timed(state, "grade", started),
-            }
+            return {"graded": [], "grades": [], "node_latencies": _timed(state, "grade", started)}
 
-        errors = state.get("grader_errors", 0)
-        if config.grading.mode == "per_chunk":
-            flags, calls = [], len(chunks)
-            for chunk in chunks:
-                try:
-                    flags.append(
-                        generate_structured(
-                            build_single_grading_prompt(state["question"], chunk),
-                            config.llm,
-                            ChunkGrade,
-                        ).relevant
-                    )
-                except StructuredOutputError:
-                    flags.append(True)  # fail open, per chunk
-                    errors += 1
-        else:
-            calls = 1
+        grades: list[int] = []
+        for chunk in chunks:
             try:
-                flags = generate_structured(
-                    build_grading_prompt(state["question"], chunks), config.llm, BatchGrades
-                ).relevant
+                grades.append(
+                    generate_structured(
+                        build_grading_prompt(state["question"], chunk), config.llm, ChunkGrade
+                    ).grade
+                )
             except StructuredOutputError:
-                # Fail open: a grader failure must not manufacture a retrieval failure
-                # and send the graph into rewrites it does not need.
-                flags, errors = [True] * len(chunks), errors + 1
-            if len(flags) != len(chunks):
-                flags = (flags + [False] * len(chunks))[: len(chunks)]
+                # Fail open: a decoding failure must not silently drop a passage.
+                grades.append(3)
 
-        kept = [c for c, ok in zip(chunks, flags, strict=True) if ok]
+        by_grade = [c for c, g in zip(chunks, grades, strict=True) if g >= grading.keep_threshold]
+        context = _apply_floor(by_grade, chunks, grading.min_chunks)
+        # Present the context in the retriever's ranking, whatever each passage's
+        # provenance, so the strongest evidence leads regardless of who selected it.
+        order = {c.chunk_id: i for i, c in enumerate(chunks)}
+        context.sort(key=lambda c: order[c.chunk_id])
+
         return {
-            "graded": kept,
-            "kept_per_round": [*rounds, len(kept)],
-            "grader_errors": errors,
-            "llm_calls": state.get("llm_calls", 0) + calls,
+            "graded": context,
+            "grades": grades,
+            "n_kept_by_grade": len(by_grade),
+            "n_kept_by_floor": len(context) - len(by_grade),
+            "max_grade": max(grades),
+            "low_confidence": max(grades) < grading.low_confidence_below,
+            "llm_calls": state.get("llm_calls", 0) + len(chunks),
             "node_latencies": _timed(state, "grade", started),
         }
 
     return grade
-
-
-def make_rewrite(config: WorkflowConfig):
-    """Reformulate the query in the filing's own vocabulary and retry retrieval."""
-
-    def rewrite_query(state: CragState) -> dict:
-        started = time.perf_counter()
-        new_query = (
-            generate(
-                build_rewrite_prompt(state["question"], state.get("tried_queries", [])),
-                config.llm,
-            )
-            .strip()
-            .strip('"')
-        )
-        return {
-            "query": new_query or state["question"],
-            "rewrites": state.get("rewrites", 0) + 1,
-            "llm_calls": state.get("llm_calls", 0) + 1,
-            "node_latencies": _timed(state, "rewrite_query", started),
-        }
-
-    return rewrite_query
-
-
-def make_fallback(config: WorkflowConfig):
-    """Rewrite budget exhausted: fall back to the first round's passages.
-
-    Deliberately NOT a canned refusal. Measured on this benchmark, questions whose
-    retrieval is judged to have failed are still answered correctly 33% of the time
-    and stay grounded 87% of the time, so refusing outright would trade those away.
-    Falling back to the original query's passages makes this path degenerate to the
-    baseline: the correction loop can then only ever help, never hurt.
-
-    Those passages are the unfiltered top-k, so with a pinned ``num_ctx`` the prompt
-    can overflow -- and Ollama truncates from the TOP, which would drop the grounding
-    instructions first and the best-ranked passages next, keeping only the weakest.
-    They are therefore trimmed from the END here instead: deliberate, deterministic,
-    and it keeps the instructions and the strongest passages. How many fit is derived
-    from the configured context, never a fixed count.
-    """
-
-    def fallback(state: CragState) -> dict:
-        chunks = state.get("initial_chunks", [])
-        num_ctx = config.llm.num_ctx
-        if num_ctx is not None:
-            fitting: list = []
-            for chunk in chunks:
-                candidate = [*fitting, chunk]
-                needed = estimated_context(
-                    build_prompt(state["question"], candidate), config.llm.max_tokens
-                )
-                if needed > num_ctx:
-                    break
-                fitting = candidate
-            chunks = fitting
-        return {"graded": chunks, "bound_hit": True}
-
-    return fallback
 
 
 def make_generate(config: WorkflowConfig):
@@ -185,16 +124,3 @@ def make_generate(config: WorkflowConfig):
         }
 
     return generate_node
-
-
-def make_route_after_grading(config: WorkflowConfig):
-    """Conditional edge: the graph -- not the model -- decides what happens next."""
-
-    def route(state: CragState) -> str:
-        if state.get("graded"):
-            return "generate"
-        if state.get("rewrites", 0) < config.max_rewrites:
-            return "rewrite_query"
-        return "fallback"
-
-    return route
