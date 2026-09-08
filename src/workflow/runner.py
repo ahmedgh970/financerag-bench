@@ -99,12 +99,13 @@ def run(
                     {"doc_id": c.doc_id, "page": c.page, "text": c.text} for c in result.sources
                 ],
                 "latency_s": result.latency_s,
-                "n_rewrites": result.n_rewrites,
-                "bound_hit": result.bound_hit,
                 "n_retrieved": result.n_retrieved,
-                "n_kept": result.n_kept,
-                "grader_errors": result.grader_errors,
-                "kept_per_round": result.kept_per_round,
+                "n_kept_by_grade": result.n_kept_by_grade,
+                "n_kept_by_floor": result.n_kept_by_floor,
+                "n_dropped_to_fit": result.n_dropped_to_fit,
+                "grades": result.grades,
+                "max_grade": result.max_grade,
+                "low_confidence": result.low_confidence,
                 "llm_calls": result.llm_calls,
                 "node_latencies": result.node_latencies,
             }

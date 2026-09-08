@@ -37,6 +37,7 @@ class WorkflowAnswer:
     n_retrieved: int = 0
     n_kept_by_grade: int = 0
     n_kept_by_floor: int = 0
+    n_dropped_to_fit: int = 0
     grades: list[int] = field(default_factory=list)
     max_grade: int | None = None
     low_confidence: bool = False
@@ -79,6 +80,7 @@ def answer_workflow(
         n_retrieved=len(state.get("chunks", [])),
         n_kept_by_grade=state.get("n_kept_by_grade", 0),
         n_kept_by_floor=state.get("n_kept_by_floor", 0),
+        n_dropped_to_fit=state.get("n_dropped_to_fit", 0),
         grades=state.get("grades", []),
         max_grade=state.get("max_grade"),
         low_confidence=state.get("low_confidence", False),

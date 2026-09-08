@@ -9,7 +9,12 @@ from __future__ import annotations
 import time
 
 from src.ingestion.schema import Chunk
-from src.llm.client import StructuredOutputError, generate, generate_structured
+from src.llm.client import (
+    StructuredOutputError,
+    estimated_context,
+    generate,
+    generate_structured,
+)
 from src.llm.prompts import build_prompt
 from src.retrieval.base import Retriever
 from src.workflow.config import WorkflowConfig
@@ -108,17 +113,45 @@ def make_grade(config: WorkflowConfig):
     return grade
 
 
+def _fit_context(chunks: list[Chunk], question: str, config: WorkflowConfig) -> list[Chunk]:
+    """Drop the lowest-ranked passages until the prompt fits the pinned context.
+
+    Without this the overflow is handled by Ollama, which truncates from the TOP: it
+    would cut the grounding instructions first, then the best-ranked passages, leaving
+    the weakest ones and no instruction to stay grounded. Trimming here inverts that --
+    the instructions and the strongest evidence survive, the weakest passages go.
+
+    How many fit is derived from ``num_ctx`` and the output budget, never a fixed count,
+    so retuning the context window automatically retunes the trim. With ``num_ctx``
+    unset the client sizes each prompt on its own and there is nothing to trim.
+    """
+    num_ctx = config.llm.num_ctx
+    if num_ctx is None or not chunks:
+        return chunks
+    fitting: list[Chunk] = []
+    for chunk in chunks:
+        candidate = [*fitting, chunk]
+        needed = estimated_context(build_prompt(question, candidate), config.llm.max_tokens)
+        if needed > num_ctx:
+            break
+        fitting = candidate
+    # A single passage larger than the whole window still beats an empty context.
+    return fitting or chunks[:1]
+
+
 def make_generate(config: WorkflowConfig):
-    """Answer from the passages the graph selected."""
+    """Answer from the passages the graph selected, trimmed to the pinned context."""
 
     def generate_node(state: CragState) -> dict:
         started = time.perf_counter()
         graded = state.get("graded")
-        sources = graded if graded is not None else state["chunks"]
+        selected = graded if graded is not None else state["chunks"]
+        sources = _fit_context(selected, state["question"], config)
         text = generate(build_prompt(state["question"], sources), config.llm)
         return {
             "answer": text,
             "sources": sources,
+            "n_dropped_to_fit": len(selected) - len(sources),
             "llm_calls": state.get("llm_calls", 0) + 1,
             "node_latencies": _timed(state, "generate", started),
         }
