@@ -1,15 +1,12 @@
-# Ablation baseline: dense k=20 -> generate, every node disabled.
-# Same graph as the other rows, so a difference between rows is attributable to the
-# node under test and not to a different code path.
-#
-# num_ctx is pinned per row, not globally: this row feeds all 20 retrieved chunks to
-# the generator (~21k tokens at the observed maximum), so it needs the larger window.
-# Pinning it to the filtered row's 12288 would truncate this prompt -- and Ollama
-# truncates from the TOP, dropping the grounding instructions first -- which would
-# handicap the baseline and flatter the grading row.
+# Ablation baseline: the same stored retrieval, every node disabled -> retrieve then
+# generate. Its prompt is byte-identical to the naive pipeline's on all 150 questions,
+# so its answers are the ones already generated and judged as
+# reranked_..._granite4.1:8b_k20 (65.3% equivalent). Kept here as the reproducible
+# definition of the row; running it would recompute an answer already on disk.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
 collection_name: docling_hybrid_1024_bge-m3
-retriever: dense
+retriever: replay
+replay_path: data/processed/prompts/prompts_reranked-dense_docling_hybrid_1024_bge-m3_docscoped_pf50_k20.jsonl
 doc_scoped: true
 k: 20
 grading:

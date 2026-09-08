@@ -35,7 +35,12 @@ class GradingConfig(BaseModel):
     enabled: bool = False
     keep_threshold: int = Field(default=2, ge=0, le=3)
     min_chunks: int = Field(default=3, ge=0)
-    # Instrumentation only: no action is taken, the flag is recorded for later analysis.
+    # Records low_confidence when the best grade across all passages stays below this:
+    # the grader saw nothing usable anywhere, which is CRAG's second threshold. No
+    # action follows -- it is kept as the hook a later node could branch on, so the
+    # signal exists in the records rather than requiring a re-run to obtain. Note it
+    # carries information of its own only when it differs from keep_threshold; at equal
+    # values it restates n_kept_by_grade == 0. Deliberately unused, not dead.
     low_confidence_below: int = Field(default=2, ge=0, le=3)
 
 

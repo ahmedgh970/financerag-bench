@@ -62,14 +62,20 @@ def test_variant_name_covers_the_ablation_matrix():
     )
 
 
-def test_shipped_configs_load_and_select_distinct_cells():
-    advanced = load_workflow_config("configs/workflow/advanced.yaml")
-    grading = load_workflow_config("configs/workflow/grading.yaml")
-    control = load_workflow_config("configs/workflow/control_top3.yaml")
-    assert variant_name(advanced) == "advanced" and advanced.retriever == "dense"
-    assert variant_name(grading) == "grading" and grading.grading.min_chunks == 3
+def test_shipped_configs_share_one_retrieval_and_differ_by_one_switch():
+    """Attribution rests on this: the rows must differ by the node under test alone."""
+    rows = {
+        name: load_workflow_config(f"configs/workflow/{name}.yaml")
+        for name in ("advanced", "grading", "control_top3")
+    }
+    # Same retrieval, replayed from the same file, so passages are byte-identical.
+    assert {c.retriever for c in rows.values()} == {"replay"}
+    assert len({c.replay_path for c in rows.values()}) == 1
+
+    assert variant_name(rows["advanced"]) == "advanced" and rows["advanced"].k == 20
+    assert variant_name(rows["grading"]) == "grading" and rows["grading"].grading.min_chunks == 3
     # The control row is the floor without the grader: top-3, no grading.
-    assert variant_name(control) == "advanced" and control.k == 3
+    assert variant_name(rows["control_top3"]) == "advanced" and rows["control_top3"].k == 3
 
 
 def test_disabled_grading_reduces_the_graph_to_retrieve_then_generate(monkeypatch):

@@ -1,15 +1,19 @@
-# Ablation row: dense k=20, reordered by the cross-encoder, then graded 0-3.
-# Differs from advanced.yaml by the grading switch (and by the reordering, which at
-# prefetch = k changes only the order of the passages, never which ones are retrieved).
+# Ablation row: the stored reranked(dense, prefetch 50) retrieval at k=20, graded 0-3.
 #
-# Retrieval: prefetch 20 with k 20 means the cross-encoder reorders the twenty dense
-# candidates rather than selecting among fifty. The grader still sees all twenty; the
-# ranking only decides which passages the floor draws on.
+# Retrieval is replayed from prompts materialised in July rather than recomputed. It is
+# deterministic, so replaying it changes nothing about what the generator sees -- the
+# prompt built from these passages is byte-identical to the one the naive pipeline used
+# (verified on all 150 questions) -- while removing the embedder and the cross-encoder
+# from the run entirely. Every row replaying this file therefore sees exactly the same
+# passages, and the whole GPU is left to the generator.
+#
+# Measured on the same 36 questions, this retrieval is worth about 19 points of
+# equivalent over dense top-20: presence of the evidence is not the same thing as
+# having it ranked where the model will use it.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
 collection_name: docling_hybrid_1024_bge-m3
-retriever: reranked
-base_retriever: dense
-rerank_prefetch: 20
+retriever: replay
+replay_path: data/processed/prompts/prompts_reranked-dense_docling_hybrid_1024_bge-m3_docscoped_pf50_k20.jsonl
 doc_scoped: true
 k: 20
 grading:
