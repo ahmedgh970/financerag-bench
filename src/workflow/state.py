@@ -40,6 +40,7 @@ class CragState(TypedDict, total=False):
     # Output
     answer: str
     sources: list[Chunk]
+    n_dropped_to_fit: int  # passages trimmed so the prompt fits the pinned num_ctx
 
     # Instrumentation
     node_latencies: dict[str, float]

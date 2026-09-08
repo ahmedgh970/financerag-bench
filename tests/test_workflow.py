@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 
 from src.ingestion.schema import Chunk
@@ -142,3 +145,78 @@ def test_context_follows_the_retriever_ranking_whatever_the_provenance(monkeypat
     ids = [c.chunk_id for c in answer_workflow("q", retriever, config).sources]
 
     assert ids == ["c0", "c1", "c4"]  # ranking order, not selection order
+
+
+def test_runner_writes_every_field_the_answer_exposes(monkeypatch, tmp_path):
+    """End-to-end through the runner, which unit tests on answer_workflow never touch.
+
+    Regression guard: the runner once referenced fields WorkflowAnswer no longer had,
+    and neither ruff nor the graph tests caught it -- the failure only surfaced after a
+    retriever and a model had been loaded, minutes into a 150-question run.
+    """
+    from src.evaluation.schema import QAItem
+    from src.workflow import runner as runner_mod
+
+    qa = QAItem(
+        id="financebench_id_00001",
+        question="q",
+        answer="gold",
+        company="C",
+        doc_name="DOC_2022_10K",
+        question_type="metrics-generated",
+        evidence=[],
+    )
+    monkeypatch.setattr(runner_mod, "load_golden_set", lambda path: [qa])
+    monkeypatch.setattr(
+        runner_mod,
+        "build_retriever",
+        lambda name, config: FakeRetriever([_chunk(i) for i in range(5)]),
+    )
+    monkeypatch.setattr(runner_mod, "_output_path", lambda config: tmp_path / "out.jsonl")
+    _patch_llm(monkeypatch, grades=[3, 2, 0, 0, 0])
+
+    out = runner_mod.run(_config(k=5, grading={"enabled": True}))
+
+    record = json.loads(Path(out).read_text().splitlines()[0])
+    assert record["id"] == qa.id and record["generated_answer"] == "generated answer"
+    assert record["grades"] == [3, 2, 0, 0, 0]
+    assert record["n_kept_by_grade"] == 2 and record["n_kept_by_floor"] == 1  # floor tops to 3
+    assert record["max_grade"] == 3 and record["low_confidence"] is False
+    assert record["llm_calls"] == 6 and len(record["sources"]) == 3
+
+
+def test_context_is_trimmed_from_the_bottom_to_fit_the_pinned_num_ctx(monkeypatch):
+    """Trimming must follow num_ctx, and drop the weakest passages, not the strongest.
+
+    Ollama truncates an oversized prompt from the top, which would eat the grounding
+    instructions first and the best-ranked passages next. Trimming here inverts that.
+    """
+    _patch_llm(monkeypatch, grades=[3] * 10)  # two runs of five passages
+
+    def sources_with(num_ctx):
+        retriever = FakeRetriever([_chunk(i) for i in range(5)])
+        config = _config(k=5, grading={"enabled": True, "min_chunks": 0})
+        config.llm.num_ctx = num_ctx
+        config.llm.max_tokens = 16
+        return answer_workflow("q", retriever, config)
+
+    roomy = sources_with(32768)
+    assert [c.chunk_id for c in roomy.sources] == ["c0", "c1", "c2", "c3", "c4"]
+    assert roomy.n_dropped_to_fit == 0
+
+    tight = sources_with(2048)
+    kept = [c.chunk_id for c in tight.sources]
+    assert kept == ["c0", "c1", "c2", "c3", "c4"][: len(kept)]  # a prefix: weakest dropped
+    assert len(kept) <= 5 and tight.n_dropped_to_fit == 5 - len(kept)
+
+
+def test_a_single_oversized_passage_still_reaches_the_prompt(monkeypatch):
+    """An empty context would be worse than one passage the window cannot hold."""
+    _patch_llm(monkeypatch, grades=[3])
+    huge = Chunk(chunk_id="big", doc_id="D", page=1, text="x" * 40_000, n_tokens=13_000)
+    config = _config(k=1, grading={"enabled": True, "min_chunks": 0})
+    config.llm.num_ctx = 2048
+
+    result = answer_workflow("q", FakeRetriever([huge]), config)
+
+    assert [c.chunk_id for c in result.sources] == ["big"]
