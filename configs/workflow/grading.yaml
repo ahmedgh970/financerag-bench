@@ -1,22 +1,24 @@
-# Ablation row: dense k=20 -> grade -> [correct] -> generate.
-# Differs from advanced.yaml by the grading switch alone.
+# Ablation row: dense k=20, reordered by the cross-encoder, then graded 0-3.
+# Differs from advanced.yaml by the grading switch (and by the reordering, which at
+# prefetch = k changes only the order of the passages, never which ones are retrieved).
 #
-# Grading keeps ~2.7 chunks out of 20, so the generation prompt drops roughly
-# sevenfold (measured: 47k -> 6.3k characters median, 12k tokens at the maximum).
-# 12288 therefore covers every filtered prompt observed over the 150 questions, and
-# keeps the model within reach of the GPU -- a real benefit of filtering, not an
-# artefact. The give-up path trims its passages to fit this same window.
+# Retrieval: prefetch 20 with k 20 means the cross-encoder reorders the twenty dense
+# candidates rather than selecting among fifty. The grader still sees all twenty; the
+# ranking only decides which passages the floor draws on.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
 collection_name: docling_hybrid_1024_bge-m3
-retriever: dense
+retriever: reranked
+base_retriever: dense
+rerank_prefetch: 20
 doc_scoped: true
 k: 20
 grading:
   enabled: true
-  mode: per_chunk
+  keep_threshold: 2   # UMBRELA: 2 = holds part of what the answer is built from
+  min_chunks: 3       # 0 = no floor, 1 = rescue an empty selection only, 3 = always three
+  low_confidence_below: 2
 calculator:
   enabled: false
-max_rewrites: 2
 llm:
   model: ollama_chat/granite4.1:8b
   temperature: 0.0

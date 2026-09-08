@@ -1,0 +1,22 @@
+# Control row: cross-encoder top-3, no grader at all.
+#
+# Needed for attribution. The floor tops the grader's selection up to three passages,
+# and the grader keeps fewer than three on roughly 60% of the questions -- so on most
+# of the benchmark the context is close to "the three best-ranked passages". Without
+# this row a gain could not be told apart from what the floor alone would achieve.
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+collection_name: docling_hybrid_1024_bge-m3
+retriever: reranked
+base_retriever: dense
+rerank_prefetch: 20
+doc_scoped: true
+k: 3
+grading:
+  enabled: false
+calculator:
+  enabled: false
+llm:
+  model: ollama_chat/granite4.1:8b
+  temperature: 0.0
+  max_tokens: 1024
+  num_ctx: 12288

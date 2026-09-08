@@ -1,35 +1,28 @@
 """Pydantic schemas for the workflow's structured LLM outputs.
 
-Each is passed to Ollama as a JSON Schema, so decoding is constrained to emit a
-valid object. That has a consequence worth keeping in mind: the model can no longer
-abstain by refusing to answer, so a schema must make abstention *expressible* -- an
-all-false list of booleans, say -- rather than leaving the model no way to say
-"none of these".
+Passed to Ollama as JSON Schema, so decoding is constrained to a valid object. The
+consequence worth keeping in mind: the model can no longer abstain by refusing, so
+abstention must be *expressible in the schema* -- here, the grade 0.
 """
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
-class BatchGrades(BaseModel):
-    """Relevance verdict for a batch of passages, one boolean per passage, in order.
-
-    Deliberately flat -- a list of booleans rather than a list of objects -- so the
-    JSON Schema carries no nested definitions, which small models follow far more
-    reliably. "No passage is relevant" is simply an all-false list, which is exactly
-    the verdict the correction loop keys on.
-    """
-
-    relevant: list[bool] = Field(description="One true/false per passage, in order")
-
-
 class ChunkGrade(BaseModel):
-    """Relevance verdict for a single passage.
+    """Graded relevance of a single passage, on the four-point UMBRELA scale.
 
-    The per-chunk counterpart of :class:`BatchGrades`. Grading one passage per call
-    removes the counting problem entirely -- one call can only produce one verdict --
-    at the cost of k calls instead of one.
+    A graded scale rather than a boolean, for two reasons. It matches how relevance
+    actually distributes -- a passage carrying one of the two line items a ratio needs
+    is neither irrelevant nor an answer -- and it turns the keep/drop decision into a
+    *threshold applied afterwards*, so one run yields the whole precision/recall curve
+    instead of one irreversible verdict.
+
+    ``Literal`` rather than a bounded int: it compiles to a JSON Schema enum, which
+    constrained decoding actually enforces, where a numeric range may not be.
     """
 
-    relevant: bool = Field(description="True if this passage helps answer the question")
+    grade: Literal[0, 1, 2, 3] = Field(description="0 irrelevant, 1 related, 2 partial, 3 exact")
