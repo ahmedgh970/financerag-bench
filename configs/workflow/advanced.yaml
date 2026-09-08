@@ -16,7 +16,6 @@ grading:
   enabled: false
 calculator:
   enabled: false
-max_rewrites: 2
 llm:
   model: ollama_chat/granite4.1:8b
   temperature: 0.0
