@@ -56,7 +56,7 @@ class GridConfig(BaseModel):
     """Parameters of an evidence-grounded grid run over judged answers.
 
     ``verdicts_path`` holds the judge's reading of each answer (``correct``,
-    ``refused``, ``alt_supported``, ``justification``); left unset, it is derived
+    ``refused``, ``justification``); left unset, it is derived
     from the answers file name, so one config grades any judged run. ``chunks_path``
     is the indexed corpus, used to resolve each gold evidence to its physical page --
     the same resolution as the retrieval metrics.

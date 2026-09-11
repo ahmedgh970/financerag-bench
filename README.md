@@ -82,22 +82,26 @@ k10→k20 step only helps the strongest models (flat for the 3B tier). See ADR 0
 
 **CRAG workflow.** The deterministic LangGraph workflow (`src/workflow/`) replays
 the same `reranked(dense)` top-20 passages for every row and generates with
-`granite4.1:8b`. Each answer is placed in one of four outcomes, based on whether
-the gold evidence page actually reached the prompt:
+`granite4.1:8b`. A judge only reads each answer (correct? refused?); the code then
+checks whether the gold evidence page actually reached the prompt, and the two
+together place the answer in one of five outcomes:
 
-- **Good job**: correct and grounded.
-- **Hallucinating**: answers without the evidence.
-- **Need help**: wrong although the evidence was in the prompt.
+- **Good job**: correct, with the gold evidence in the prompt.
+- **Unverified**: correct but unverified in the context — the gold evidence never
+  reached the prompt, so the answer may rest on another passage (an MD&A table
+  repeating the statement, say) or on luck.
+- **Need help**: wrong although the gold evidence was in the prompt (generation failure).
+- **Hallucinating**: wrong, and the gold evidence never reached the prompt.
 - **Don't know**: refusal.
 
 Full grid, per-question transitions and failure analysis are in
 [ADR 0004](docs/adr/0004-crag-workflow-evidence-grid.md).
 
-| Workflow row | Good job | Hallucinating | Need help | Don't know | Evidence in prompt | Latency / Q | LLM calls / Q |
-|---|---|---|---|---|---|---|---|
-| advanced, `num_ctx` 12288 (~10 passages) | 79 | 32 | 16 | 23 | 93 | 107 s | 1 |
-| grading 0–3 + floor of 3, `num_ctx` 12288 | 83 | 31 | 14 | 22 | 92 | 161 s | 20.9 |
-| **advanced, `num_ctx` 24576 (~20 passages)** | **88** | **21** | 22 | **19** | **105** | 187 s | 1 |
+| Workflow row | Good job | Unverified | Hallucinating | Need help | Don't know | Evidence in prompt | Latency / Q | LLM calls / Q |
+|---|---|---|---|---|---|---|---|---|
+| advanced, `num_ctx` 12288 (~10 passages) | 73 | 13 | 25 | 16 | 23 | 93 | 107 s | 1 |
+| grading 0–3 + floor of 3, `num_ctx` 12288 | 74 | 14 | 26 | 14 | 22 | 92 | 161 s | 20.9 |
+| **advanced, `num_ctx` 24576 (~20 passages)** | **79** | 13 | **17** | 22 | **19** | **105** | 187 s | 1 |
 
 Key finding: the larger window is the best row, but only 4 of its 16 gains over
 the 12K window come from newly retrieved evidence. The rest reflect how

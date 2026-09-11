@@ -2,7 +2,9 @@
 
 ## Statut
 
-Accepté.
+Accepté. Amendé le 2026-09-11 : `alt_supported` remplacé par la catégorie
+`unverified` (voir « Amendement » en fin de document ; les chiffres des sections
+Résultats et Analyse sont ceux de la grille d'origine à 4 catégories).
 
 ## Contexte
 
@@ -216,3 +218,47 @@ retrieval constant.
     Latences mesurées sur le GPU portable 8 Go (valables en relatif).
 - **Suite** : optimiser le grader (coût et rappel de l'evidence) et le prompt de
   génération, puis re-mesurer contre advanced 24K avec cette grille.
+
+## Amendement du 2026-09-11 : catégorie `unverified`
+
+**Pourquoi.** La grille doit pouvoir tourner avec un juge local, sans Claude,
+pour que le projet soit repris par d'autres. Or `alt_supported` est le seul
+verdict qui oblige le juge à lire les passages du prompt (vérifier que les
+chiffres d'une réponse juste figurent dans un autre passage que la page gold) :
+c'est lui qui alourdit le contexte du juge et qui est le plus difficile à
+fiabiliser. Le remplacer par du code (chercher les chiffres de la réponse dans
+les passages) ne tient pas : plusieurs appuis alternatifs sont textuels (Q146,
+Q121, Q78), et un matcher numérique déterministe avait déjà été essayé puis
+rejeté.
+
+**Nouvelle règle.** Le juge ne rend plus que `correct` et `refused` ; le code
+calcule toujours si la page gold a atteint le prompt. Une réponse juste sans la
+page gold n'est plus classée `good_job` (appui alternatif) ou `hallucinating`
+(sans appui) : elle a sa propre catégorie.
+
+| Catégorie | Condition |
+|---|---|
+| **good_job** | juste, page gold dans le prompt |
+| **unverified** | juste mais non vérifiée dans le contexte : la page gold n'a pas atteint le prompt, la réponse peut reposer sur un autre passage (MD&A) ou sur la chance |
+| **need_help** | faux, page gold dans le prompt |
+| **hallucinating** | faux, page gold absente |
+| **dont_know** | refus |
+
+**Grilles recalculées** à partir des mêmes verdicts (aucun nouveau jugement) :
+
+| Ligne | good_job | unverified | hallucinating | need_help | dont_know |
+|---|---:|---:|---:|---:|---:|
+| advanced, `num_ctx` 12 288 | 73 | 13 | 25 | 16 | 23 |
+| grading, `num_ctx` 12 288 | 74 | 14 | 26 | 14 | 22 |
+| **advanced, `num_ctx` 24 576** | **79** | 13 | **17** | 22 | 19 |
+
+**Ce qui change dans la lecture.**
+
+- **Le classement ne change pas** : advanced 24K reste la meilleure ligne.
+- **L'avance du grading sur advanced 12K fond** : elle passe de +4 à +1. Une
+  partie de ses Good job venaient d'appuis alternatifs, 9 contre 6 pour
+  advanced 12K.
+- **`hallucinating` ne contient plus que des réponses fausses sans evidence.**
+- **`need_help` et `dont_know` sont inchangés.**
+
+Les analyses ci-dessus (typologie des échecs, coût du grader) restent valables.
