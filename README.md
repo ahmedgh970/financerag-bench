@@ -171,6 +171,13 @@ make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_reranked_dense
 # 5. Generate answers with the RAG pipeline (local Ollama, no quota)
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml                            # all 150 QA
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml ID=financebench_id_03029  # one QA
+
+# 6. Score the answers (one config per family, the answers file picked with ANSWERS=)
+make judge ANSWERS=data/processed/answers/<run>.jsonl                          # LLM judge, correct / grounded
+make judge ANSWERS=data/processed/answers/<run>.jsonl MODEL=ollama_chat/qwen3.5:9b  # another judge model
+make judge JUDGE=prometheus ANSWERS='data/processed/answers/*_k20.jsonl'       # Prometheus-2, 1-5 rubric
+make grid ANSWERS=data/processed/answers/<run>.jsonl                           # outcome grid from verdicts
+make ragas ANSWERS=data/processed/answers/<run>.jsonl LIMIT=50                 # faithfulness, answer relevancy
 ```
 
 ---
@@ -215,10 +222,12 @@ financerag-bench/
 │   ├── parse/
 │   ├── chunk/
 │   ├── index/
-│   ├── eval/
 │   ├── rag/                       # naive RAG: retriever × LLM × k
-│   ├── workflow/                  # CRAG workflow rows (advanced, grading, controls)
-│   └── judge/                     # llm_judge + evidence_grid; pick the run with ANSWERS=
+│   ├── workflow/                  # CRAG workflow rows (advanced, grading)
+│   └── evaluation/
+│       ├── retrieval/             # one config per retriever setup (chunks512_*)
+│       ├── judge/                 # correct_grounded, prometheus, evidence_grid
+│       └── ragas/                 # ragas (critic, metrics, context window)
 ├── data/
 │   ├── pdfs/                      # 368 docs
 │   ├── jsons/                     # 150 QA pairs (FinanceBench open-source)
@@ -232,7 +241,11 @@ financerag-bench/
 │   ├── rag/                       # naive pipeline: retrieve once, generate once
 │   ├── workflow/                  # deterministic CRAG graph (LangGraph): grading, context trimming
 │   ├── agents/                    # ReAct agent (final comparison tier)
-│   ├── evaluation/                # retrieval metrics, outcome grid, Ragas, runners
+│   ├── evaluation/                # run_retrieval / run_judge / run_ragas entry points
+│   │   ├── common/                # golden set, gold-page matching, JSONL plumbing
+│   │   ├── retrieval/             # recall@k / MRR / nDCG
+│   │   ├── judge/                 # judging protocols + evidence-grounded outcome grid
+│   │   └── ragas/                 # Ragas metrics + critic served at a pinned context
 │   └── api/                       # FastAPI
 ├── dashboard/                     # Streamlit benchmark explorer
 ├── tests/                         # pytest (unit + integration + eval regression)
