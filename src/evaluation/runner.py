@@ -18,9 +18,9 @@ from pathlib import Path
 
 from tqdm import tqdm
 
+from src.evaluation.common.golden_set import load_golden_set
+from src.evaluation.common.matching import build_page_index, is_relevant, resolve_gold_pages
 from src.evaluation.config import EvalConfig, load_eval_config
-from src.evaluation.golden_set import load_golden_set
-from src.evaluation.matching import build_page_index, is_relevant, resolve_gold_pages
 from src.evaluation.metrics import ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank
 from src.retrieval.base import ScoredChunk
 from src.retrieval.registry import build_retriever

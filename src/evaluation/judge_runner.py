@@ -14,49 +14,30 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 from tqdm import tqdm
 
+from src.evaluation.common.io import append_jsonl, derived_path, done_ids, read_jsonl, select
 from src.evaluation.config import JudgeConfig, load_judge_config
 from src.evaluation.judge import judge
 
 
-def _judged_ids(path: Path) -> set[str]:
-    """QA ids already judged in ``path`` (empty set if it doesn't exist yet)."""
-    if not path.exists():
-        return set()
-    with path.open(encoding="utf-8") as f:
-        return {json.loads(line)["id"] for line in f if line.strip()}
-
-
-def _load_records(path: str, qa_id: str | None) -> list[dict]:
-    """Answer records from ``path``, or just the one matching ``qa_id``."""
-    records = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
-    if qa_id is None:
-        return records
-    selected = [r for r in records if r["id"] == qa_id]
-    if not selected:
-        raise SystemExit(f"No answer with id {qa_id!r} in {path!r}.")
-    return selected
-
-
 def _output_path(config: JudgeConfig) -> Path:
     """One file per (answers file, judge model) combination."""
-    model = config.llm.model.replace("/", "_")
-    answers_name = Path(config.answers_path).stem
-    return Path("data/processed/judged") / f"{answers_name}_judged_by_{model}.jsonl"
+    return derived_path(
+        config.answers_path, "data/processed/judged", f"judged_by_{config.llm.model}"
+    )
 
 
 def run(config: JudgeConfig, qa_id: str | None = None) -> str:
     """Judge every not-yet-judged answer (or just ``qa_id``) and append verdicts to a JSONL."""
-    records = _load_records(config.answers_path, qa_id)
+    records = select(read_jsonl(config.answers_path), qa_id)
 
     out_path = _output_path(config)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    done = _judged_ids(out_path)
+    done = done_ids(out_path)
     remaining = [r for r in records if r["id"] not in done]
     if not remaining:
         print(f"All {len(records)} answers already judged -> {out_path}")
@@ -64,15 +45,11 @@ def run(config: JudgeConfig, qa_id: str | None = None) -> str:
 
     n_equivalent = 0
     n_correct_not_grounded = 0
-    with out_path.open("a", encoding="utf-8") as f:
-        for r in tqdm(remaining, desc="judge"):
-            verdict = judge(r["question"], r["gold_answer"], r["generated_answer"], config.llm)
-            record = {**r, **verdict, "judge_model": config.llm.model}
-            f.write(json.dumps(record) + "\n")
-            f.flush()
-
-            n_equivalent += verdict["equivalent"]
-            n_correct_not_grounded += verdict["correct"] and not verdict["grounded"]
+    for r in tqdm(remaining, desc="judge"):
+        verdict = judge(r["question"], r["gold_answer"], r["generated_answer"], config.llm)
+        append_jsonl(out_path, {**r, **verdict, "judge_model": config.llm.model})
+        n_equivalent += verdict["equivalent"]
+        n_correct_not_grounded += verdict["correct"] and not verdict["grounded"]
 
     print(
         f"Judged {len(remaining)} new answers (skipped {len(done)} already judged) -> {out_path}\n"

@@ -19,16 +19,12 @@ import json
 from collections import Counter
 from pathlib import Path
 
+from src.evaluation.common.golden_set import load_golden_set
+from src.evaluation.common.io import read_by_id
+from src.evaluation.common.matching import build_page_index, resolve_evidence_page
+from src.evaluation.common.schema import QAItem
 from src.evaluation.config import GridConfig, load_grid_config
-from src.evaluation.golden_set import load_golden_set
 from src.evaluation.grounding import Outcome, evidence_retrieved, outcome
-from src.evaluation.matching import build_page_index, resolve_evidence_page
-from src.evaluation.schema import QAItem
-
-
-def _read_jsonl(path: str) -> dict[str, dict]:
-    with Path(path).open(encoding="utf-8") as f:
-        return {r["id"]: r for r in (json.loads(line) for line in f if line.strip())}
 
 
 def _verdicts_path(config: GridConfig) -> Path:
@@ -70,8 +66,8 @@ def grade(answer: dict, verdict: dict, qa: QAItem, evidence_pages: list[int | No
 
 def run(config: GridConfig) -> str:
     """Grade every judged answer and write the grid records to a JSONL."""
-    answers = _read_jsonl(config.answers_path)
-    verdicts = _read_jsonl(str(_verdicts_path(config)))
+    answers = read_by_id(config.answers_path)
+    verdicts = read_by_id(_verdicts_path(config))
     qas = {qa.id: qa for qa in load_golden_set(config.golden_set_path)}
 
     missing = sorted(answers.keys() - verdicts.keys())

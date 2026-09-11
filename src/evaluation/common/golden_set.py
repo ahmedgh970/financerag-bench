@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.evaluation.schema import Evidence, QAItem
+from src.evaluation.common.schema import Evidence, QAItem
 
 
 def load_golden_set(path: str) -> list[QAItem]:

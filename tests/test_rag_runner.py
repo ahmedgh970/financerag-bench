@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from src.evaluation.schema import QAItem
+from src.evaluation.common.schema import QAItem
 from src.rag.config import RagConfig
 from src.rag.runner import _answered_ids, _output_path, _select
 
