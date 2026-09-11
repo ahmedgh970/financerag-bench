@@ -23,7 +23,7 @@ help:
 	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=..., optional ID=<qa_id> for one question)"
 	@echo "  make judge          LLM-judge answers against gold -> data/processed/judged/ (optional JUDGE=correct_grounded|prometheus, MODEL=, ANSWERS=<file(s) or glob>, ID=, LIMIT=)"
 	@echo "  make grid           Place judged answers in the evidence-grounded outcome grid -> data/processed/judged/ (optional ANSWERS=<answers.jsonl>)"
-	@echo "  make ragas          Score an answers file with Ragas -> data/processed/ragas/ (CONFIG=..., optional ID=<qa_id> or LIMIT=<n>)"
+	@echo "  make ragas          Score answers with Ragas -> data/processed/ragas/ (optional MODEL=, ANSWERS=<file(s) or glob>, ID=, LIMIT=)"
 	@echo "  make prompts        Pre-materialize generation prompts per question x k -> data/processed/prompts/ (optional LIMIT=<n>)"
 	@echo "  make generate       Run the local Ollama lineup on materialized prompts -> data/processed/answers/ (optional MODELS=, KS=, LIMIT=)"
 	@echo "  make chunk-dist     Plot real chunk-size distribution per budget -> docs/adr/assets/ (needs install-all)"
@@ -75,7 +75,7 @@ grid:
 	uv run python -m src.evaluation.run_judge grid --config $(call stage_config,configs/evaluation/judge/evidence_grid.yaml) $(if $(ANSWERS),--answers $(ANSWERS),)
 
 ragas:
-	uv run python -m src.evaluation.ragas_runner --config $(CONFIG) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)
+	uv run python -m src.evaluation.run_ragas --config $(call stage_config,configs/evaluation/ragas/ragas.yaml) $(if $(ANSWERS),--answers $(ANSWERS),) $(if $(MODEL),--model $(MODEL),) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)
 
 prompts:
 	uv run python scripts/materialize_prompts.py $(if $(LIMIT),--limit $(LIMIT),)

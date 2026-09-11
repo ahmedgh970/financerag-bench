@@ -32,9 +32,9 @@ from ragas.metrics.collections import (
 from ragas.metrics.result import MetricResult
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
+from src.evaluation.ragas.config import ALL_METRICS
 from src.llm.config import LLMConfig
 
-# Same transient-error/backoff policy as src/llm/client.py: Groq's TPM limit
 # Retry transient transport failures around each metric call: instructor's own
 # built-in max_retries only covers response-validation retries, not raw API
 # errors, so wrap the call here. (No quota locally, but a busy Ollama can still
@@ -77,9 +77,6 @@ def _load_embeddings(model_name: str) -> OpenAIEmbeddings:
     """
     client = _build_client()
     return OpenAIEmbeddings(client=client, model=model_name)
-
-
-ALL_METRICS = ("faithfulness", "answer_relevancy", "context_precision", "context_recall")
 
 
 def build_metrics(
