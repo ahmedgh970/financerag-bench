@@ -176,11 +176,11 @@ make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_reranked_dense
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml                            # all 150 QA
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml ID=financebench_id_03029  # one QA
 
-# 6. Score the answers (one config per family, the answers file picked with ANSWERS=)
-make judge ANSWERS=data/processed/answers/<run>.jsonl                          # LLM judge, correct / grounded
+# 6. Score the answers (the answers file picked with ANSWERS=, the judge protocol with PROTOCOL=)
+make judge ANSWERS=data/processed/answers/<run>.jsonl                          # outcome grid (PROTOCOL=grid, default)
 make judge ANSWERS=data/processed/answers/<run>.jsonl MODEL=ollama_chat/qwen3.5:9b  # another judge model
-make judge JUDGE=prometheus ANSWERS='data/processed/answers/*_k20.jsonl'       # Prometheus-2, 1-5 rubric
-make grid ANSWERS=data/processed/answers/<run>.jsonl                           # outcome grid from verdicts
+make judge PROTOCOL=correct_grounded ANSWERS=data/processed/answers/<run>.jsonl     # correct / grounded
+make judge PROTOCOL=prometheus ANSWERS='data/processed/answers/*_k20.jsonl'    # Prometheus-2, 1-5 rubric
 make ragas ANSWERS=data/processed/answers/<run>.jsonl LIMIT=50                 # faithfulness, answer relevancy
 ```
 
@@ -230,7 +230,7 @@ financerag-bench/
 │   ├── workflow/                  # CRAG workflow rows (advanced, grading)
 │   └── evaluation/
 │       ├── retrieval/             # one config per retriever setup (chunks512_*)
-│       ├── judge/                 # correct_grounded, prometheus, evidence_grid
+│       ├── judge/                 # one config per protocol: grid, correct_grounded, prometheus
 │       └── ragas/                 # ragas (critic, metrics, context window)
 ├── data/
 │   ├── pdfs/                      # 368 docs

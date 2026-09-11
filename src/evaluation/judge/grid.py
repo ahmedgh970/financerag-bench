@@ -18,7 +18,8 @@ one outcome, which also attributes the failure to retrieval or generation:
 - ``need_help``: wrong although the evidence was in the prompt (generation failure).
 - ``hallucinating``: wrong, and the evidence never reached the prompt.
 
-The judge only reads the answer (``correct`` / ``refused``, from a verdicts file);
+The judge only reads the answer (``correct`` / ``refused``, written to a verdicts
+file by the ``grid`` judging protocol, or by any external judge in the same format);
 whether the evidence reached the prompt is computed here, never taken from the judge.
 """
 
@@ -28,10 +29,12 @@ from enum import StrEnum
 from pathlib import Path
 
 from src.evaluation.common.golden_set import load_golden_set
-from src.evaluation.common.io import read_by_id
+from src.evaluation.common.io import derived_path, read_by_id
 from src.evaluation.common.matching import build_page_index, resolve_evidence_page
 from src.evaluation.common.schema import QAItem
-from src.evaluation.judge.config import GridConfig
+from src.evaluation.judge.config import JudgeConfig
+
+JUDGED_DIR = Path("data/processed/judged")
 
 
 class Outcome(StrEnum):
@@ -69,20 +72,21 @@ def outcome(*, correct: bool, refused: bool, retrieved: bool) -> Outcome:
     return Outcome.NEED_HELP if retrieved else Outcome.HALLUCINATING
 
 
-def verdicts_path(config: GridConfig) -> Path:
-    """The configured verdicts file, or ``verdicts/{answers stem}.{judge}.jsonl``."""
-    if config.verdicts_path:
-        return Path(config.verdicts_path)
-    return Path("data/processed/judged/verdicts") / (
-        f"{Path(config.answers_path).stem}.{config.judge_model}.jsonl"
-    )
+def verdicts_path(config: JudgeConfig) -> Path:
+    """``data/processed/judged/verdicts/{answers stem}.{judge}.jsonl``."""
+    judge = config.judge_name.replace("/", "_")
+    return JUDGED_DIR / "verdicts" / f"{Path(config.answers_path).stem}.{judge}.jsonl"
 
 
-def grid_path(config: GridConfig) -> Path:
+def grid_path(config: JudgeConfig) -> Path:
     """``data/processed/judged/{answers stem}_grid_by_{judge}.jsonl``."""
-    return Path("data/processed/judged") / (
-        f"{Path(config.answers_path).stem}_grid_by_{config.judge_model}.jsonl"
-    )
+    return derived_path(config.answers_path, JUDGED_DIR, f"grid_by_{config.judge_name}")
+
+
+def with_gold_justification(records: list[dict], golden_set_path: str) -> list[dict]:
+    """``records`` with FinanceBench's gold justification, which answers files do not carry."""
+    qas = {qa.id: qa for qa in load_golden_set(golden_set_path)}
+    return [{**r, "gold_justification": qas[r["id"]].justification} for r in records]
 
 
 def grade(answer: dict, verdict: dict, qa: QAItem, evidence_pages: list[int | None]) -> dict:
@@ -102,10 +106,11 @@ def grade(answer: dict, verdict: dict, qa: QAItem, evidence_pages: list[int | No
     }
 
 
-def build_grid(config: GridConfig) -> list[dict]:
+def build_grid(config: JudgeConfig) -> list[dict]:
     """One grid record per answer; exits if any answer has no verdict yet."""
     answers = read_by_id(config.answers_path)
-    verdicts = read_by_id(verdicts_path(config))
+    path = verdicts_path(config)
+    verdicts = read_by_id(path) if path.exists() else {}
     qas = {qa.id: qa for qa in load_golden_set(config.golden_set_path)}
 
     missing = sorted(answers.keys() - verdicts.keys())
@@ -120,6 +125,6 @@ def build_grid(config: GridConfig) -> list[dict]:
             resolve_evidence_page(ev.text, page_index.get(qa.doc_name, {})) for ev in qa.evidence
         ]
         records.append(
-            {**grade(answers[i], verdicts[i], qa, pages), "judge_model": config.judge_model}
+            {**grade(answers[i], verdicts[i], qa, pages), "judge_model": config.judge_name}
         )
     return records

@@ -185,15 +185,16 @@ retrieval constant.
   - `src/evaluation/judge/grid.py` : evidence présente (critère A), règle de
     catégorie, et jointure réponses / verdicts / golden set, en échec si un
     verdict manque ;
-  - `src/evaluation/run_judge.py grid` : écrit la grille et affiche ses
-    comptes ;
+  - `src/evaluation/run_judge.py` (protocole `grid`) : écrit la grille et
+    affiche ses comptes une fois que chaque réponse a son verdict ;
   - `src/evaluation/common/matching.py` : résolution des pages gold, partagée
     avec l'évaluation du retrieval ;
   - `scripts/judge_view.py` : vue de jugement par question (réponses entières,
     sources, passages) ;
-  - `configs/evaluation/judge/evidence_grid.yaml` : une seule config pour tous
-    les runs, le run étant choisi par `make grid ANSWERS=<answers.jsonl>` ; les
-    verdicts sont retrouvés d'après le nom du fichier de réponses.
+  - `configs/evaluation/judge/grid.yaml` : une seule config pour tous les runs,
+    le run étant choisi par `make judge ANSWERS=<answers.jsonl>` (protocole
+    `grid` par défaut) ; les verdicts sont retrouvés d'après le nom du fichier
+    de réponses et le juge (`MODEL=claude` pour les verdicts de Claude).
 - **Données** (locales, non versionnées) :
   - verdicts dans
     `data/processed/judged/verdicts/{answers_stem}.claude.jsonl` ;

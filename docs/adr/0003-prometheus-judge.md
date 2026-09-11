@@ -112,7 +112,7 @@ lit les **moyennes absolues** de Prometheus (le *classement*, lui, tient).
 - Code figé :
   - `src/evaluation/judge/protocols/prometheus.py` : protocole verbatim et
     parse `[RESULT]` ;
-  - `make judge JUDGE=prometheus ANSWERS=...` (config
+  - `make judge PROTOCOL=prometheus ANSWERS=...` (config
     `configs/evaluation/judge/prometheus.yaml`) : batch resumable ;
   - `scripts/judge_ranking.py` : ρ/τ, avec auto-découverte des cellules jugées
     par les deux juges.
