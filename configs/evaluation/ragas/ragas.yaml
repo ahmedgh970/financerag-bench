@@ -1,0 +1,20 @@
+# Ragas: generation quality of an answers file, scored by a local critic.
+# One config for every answers file: pick them with ANSWERS= (several files or a glob),
+# the critic with MODEL=, a subset with LIMIT= (Ragas makes ~4 LLM calls per question).
+#   make ragas LIMIT=50
+#   make ragas ANSWERS='data/processed/answers/naif_rag/*_k10.jsonl' LIMIT=50
+# Default run: the naive pipeline, reranked(dense) -> granite4.1:8b at k10.
+answers_path: data/processed/answers/naif_rag/reranked_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k10.jsonl
+llm:
+  # mistral-nemo (12B) handles answer_relevancy's structured output where an 8B critic fails.
+  model: ollama_chat/mistral-nemo
+  # A k10 faithfulness prompt is ~14k tokens. The OpenAI endpoint Ragas uses cannot set the
+  # window per request, so the critic runs as a variant pinned here (ragas-critic-<model>-<num_ctx>).
+  # k20 prompts (~21k) would need ~24k, whose KV cache no longer fits an 8 GB GPU with bge-m3.
+  num_ctx: 16384
+  # Ragas' default 1024 truncates faithfulness's per-statement JSON on long answers.
+  max_tokens: 4096
+embedding_model: bge-m3
+# Generation metrics only: context_precision/recall depend on the retriever alone
+# (identical across generators at a fixed k) and are covered by the retrieval eval.
+metrics: [faithfulness, answer_relevancy]
