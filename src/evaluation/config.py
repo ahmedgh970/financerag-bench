@@ -55,6 +55,29 @@ def load_judge_config(path: str) -> JudgeConfig:
     return JudgeConfig(**data)
 
 
+class GridConfig(BaseModel):
+    """Parameters of an evidence-grounded grid run over judged answers.
+
+    ``verdicts_path`` holds the judge's reading of each answer (``correct``,
+    ``refused``, ``alt_supported``, ``justification``); left unset, it is derived
+    from the answers file name, so one config grades any judged run. ``chunks_path``
+    is the indexed corpus, used to resolve each gold evidence to its physical page --
+    the same resolution as the retrieval metrics.
+    """
+
+    answers_path: str
+    verdicts_path: str | None = None
+    chunks_path: str
+    judge_model: str
+    golden_set_path: str = "data/jsons/financebench_open_source.jsonl"
+
+
+def load_grid_config(path: str) -> GridConfig:
+    """Load and validate a grid config from a YAML file."""
+    data = yaml.safe_load(Path(path).read_text()) or {}
+    return GridConfig(**data)
+
+
 class RagasConfig(BaseModel):
     """Parameters of a Ragas run: score an existing answers JSONL on faithfulness,
     answer relevancy, context precision, and context recall."""
