@@ -66,20 +66,18 @@ def test_resolve_evidence_page_picks_best_overlap():
 
 
 @pytest.mark.parametrize(
-    ("correct", "refused", "retrieved", "alt", "expected"),
+    ("correct", "refused", "retrieved", "expected"),
     [
-        (True, False, True, False, Outcome.GOOD_JOB),
-        (True, False, False, True, Outcome.GOOD_JOB),  # figures verified in another passage
-        (True, False, False, False, Outcome.HALLUCINATING),  # right without support
-        (False, False, False, False, Outcome.HALLUCINATING),
-        (False, False, True, False, Outcome.NEED_HELP),  # evidence there, still wrong
-        (False, True, True, False, Outcome.DONT_KNOW),  # refusal wins over everything
-        (False, True, False, False, Outcome.DONT_KNOW),
+        (True, False, True, Outcome.GOOD_JOB),
+        (True, False, False, Outcome.UNVERIFIED),  # right, but the gold evidence never showed
+        (False, False, True, Outcome.NEED_HELP),  # evidence there, still wrong
+        (False, False, False, Outcome.HALLUCINATING),
+        (False, True, True, Outcome.DONT_KNOW),  # refusal wins over everything
+        (False, True, False, Outcome.DONT_KNOW),
     ],
 )
-def test_outcome(correct, refused, retrieved, alt, expected):
-    got = outcome(correct=correct, refused=refused, retrieved=retrieved, alt_supported=alt)
-    assert got is expected
+def test_outcome(correct, refused, retrieved, expected):
+    assert outcome(correct=correct, refused=refused, retrieved=retrieved) is expected
 
 
 def test_grade_combines_the_verdict_with_the_computed_evidence():
@@ -89,7 +87,7 @@ def test_grade_combines_the_verdict_with_the_computed_evidence():
     assert record["evidence_retrieved"] is True
     assert record["outcome"] == "need_help"
     assert record["evidence_pages"] == [46]
-    assert record["alt_supported"] is False  # absent from the verdict -> not supported
+    assert "alt_supported" not in record  # the grid no longer asks the judge for it
 
 
 def _write_jsonl(path, rows):
@@ -126,9 +124,7 @@ def test_run_end_to_end(tmp_path, monkeypatch):
     answers = tmp_path / "answers.jsonl"
     _write_jsonl(answers, [{"id": "q1", "sources": [_src(3, "unrelated risk factors")]}])
     verdicts = tmp_path / "verdicts.jsonl"
-    _write_jsonl(
-        verdicts, [{"id": "q1", "correct": True, "refused": False, "alt_supported": False}]
-    )
+    _write_jsonl(verdicts, [{"id": "q1", "correct": True, "refused": False}])
 
     config = GridConfig(
         answers_path=str(answers),
@@ -139,7 +135,7 @@ def test_run_end_to_end(tmp_path, monkeypatch):
     )
     out = json.loads((tmp_path / grid(config)).read_text().splitlines()[0])
     assert out["evidence_pages"] == [46]
-    assert out["outcome"] == "hallucinating"  # right answer, gold page never reached the prompt
+    assert out["outcome"] == "unverified"  # right answer, gold page never reached the prompt
 
 
 def test_verdicts_path_defaults_to_the_answers_stem():
