@@ -21,6 +21,7 @@ def load_golden_set(path: str) -> list[QAItem]:
                 id=rec["financebench_id"],
                 question=rec["question"],
                 answer=rec["answer"],
+                justification=rec.get("justification") or "",
                 company=rec["company"],
                 doc_name=rec["doc_name"],
                 question_type=rec["question_type"],

@@ -1,9 +1,9 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index answer eval-retrieval judge grid ragas prompts generate chunk-dist serve demo docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index answer eval-retrieval judge ragas prompts generate chunk-dist serve demo docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/evaluation/retrieval/chunks512_dense.yaml
-# Judge protocol for make judge: configs/evaluation/judge/$(JUDGE).yaml
-JUDGE ?= correct_grounded
+# Judging protocol for make judge (grid | correct_grounded | prometheus): configs/evaluation/judge/$(PROTOCOL).yaml
+PROTOCOL ?= grid
 # CONFIG when given on the command line, else the stage's own default config.
 stage_config = $(if $(filter command line,$(origin CONFIG)),$(CONFIG),$(1))
 
@@ -21,8 +21,7 @@ help:
 	@echo "  make index          Embed chunks.jsonl -> Qdrant collection (CONFIG=...)"
 	@echo "  make eval-retrieval Score a retriever: recall@k / MRR / nDCG -> docs/benchmarks/ (CONFIG=configs/evaluation/retrieval/...yaml)"
 	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=..., optional ID=<qa_id> for one question)"
-	@echo "  make judge          LLM-judge answers against gold -> data/processed/judged/ (optional JUDGE=correct_grounded|prometheus, MODEL=, ANSWERS=<file(s) or glob>, ID=, LIMIT=)"
-	@echo "  make grid           Place judged answers in the evidence-grounded outcome grid -> data/processed/judged/ (optional ANSWERS=<answers.jsonl>)"
+	@echo "  make judge          Judge answers against gold -> data/processed/judged/ (optional PROTOCOL=grid|correct_grounded|prometheus, MODEL=, ANSWERS=<file(s) or glob>, ID=, LIMIT=)"
 	@echo "  make ragas          Score answers with Ragas -> data/processed/ragas/ (optional MODEL=, ANSWERS=<file(s) or glob>, ID=, LIMIT=)"
 	@echo "  make prompts        Pre-materialize generation prompts per question x k -> data/processed/prompts/ (optional LIMIT=<n>)"
 	@echo "  make generate       Run the local Ollama lineup on materialized prompts -> data/processed/answers/ (optional MODELS=, KS=, LIMIT=)"
@@ -69,10 +68,7 @@ answer:
 	uv run python -m src.rag.runner --config $(CONFIG) $(if $(ID),--id $(ID),)
 
 judge:
-	uv run python -m src.evaluation.run_judge score --config $(call stage_config,configs/evaluation/judge/$(JUDGE).yaml) $(if $(ANSWERS),--answers $(ANSWERS),) $(if $(MODEL),--model $(MODEL),) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)
-
-grid:
-	uv run python -m src.evaluation.run_judge grid --config $(call stage_config,configs/evaluation/judge/evidence_grid.yaml) $(if $(ANSWERS),--answers $(ANSWERS),)
+	uv run python -m src.evaluation.run_judge --config $(call stage_config,configs/evaluation/judge/$(PROTOCOL).yaml) $(if $(ANSWERS),--answers $(ANSWERS),) $(if $(MODEL),--model $(MODEL),) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)
 
 ragas:
 	uv run python -m src.evaluation.run_ragas --config $(call stage_config,configs/evaluation/ragas/ragas.yaml) $(if $(ANSWERS),--answers $(ANSWERS),) $(if $(MODEL),--model $(MODEL),) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)

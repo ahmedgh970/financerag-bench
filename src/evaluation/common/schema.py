@@ -18,11 +18,14 @@ class QAItem(BaseModel):
 
     ``doc_name`` matches a chunk's ``doc_id``; each ``Evidence.page`` matches a
     chunk's ``page`` — that pair is what the retrieval metrics score against.
+    ``justification`` is FinanceBench's note on how the gold answer was obtained
+    (line item read, formula applied), empty when the dataset gives none.
     """
 
     id: str
     question: str
     answer: str
+    justification: str = ""
     company: str
     doc_name: str
     question_type: str

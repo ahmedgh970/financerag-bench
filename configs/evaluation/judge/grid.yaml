@@ -1,0 +1,21 @@
+# Evidence-grounded outcome grid (ADR 0004): the judge reads each answer against the gold
+# (correct? refused?) and the code checks whether the gold evidence reached the prompt,
+# placing every answer in good_job / unverified / need_help / hallucinating / dont_know.
+# The judge never sees the retrieved passages, so a short context window is enough.
+#   make judge
+#   make judge ANSWERS=data/processed/answers/<run>.jsonl
+#   make judge ANSWERS=data/processed/answers/<run>.jsonl MODEL=ollama_chat/qwen3.5:9b
+# Verdicts: data/processed/judged/verdicts/{answers stem}.{judge}.jsonl, then the grid:
+# data/processed/judged/{answers stem}_grid_by_{judge}.jsonl.
+# Default run: the workflow advanced row at num_ctx 24576, the current reference.
+answers_path: data/processed/answers/workflow_advanced_replay_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20.jsonl
+protocol: grid
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+llm:
+  model: ollama_chat/mistral-nemo
+  temperature: 0.0
+  # Room for the JSON verdict; a truncated object would fail to validate.
+  max_tokens: 512
+  # Pinned so Ollama keeps one loaded instance; fits the longest prompt of the
+  # workflow runs (a 1024-token answer), and is refused, not truncated, if exceeded.
+  num_ctx: 4096
