@@ -1,8 +1,10 @@
 # Ablation baseline: the same stored retrieval, every node disabled -> retrieve then
-# generate. Its prompt is byte-identical to the naive pipeline's on all 150 questions,
-# so its answers are the ones already generated and judged as
-# reranked_..._granite4.1:8b_k20 (65.3% equivalent). Kept here as the reproducible
-# definition of the row; running it would recompute an answer already on disk.
+# generate. Before trimming, its prompt is byte-identical to the naive pipeline's.
+#
+# The pinned num_ctx decides how many of the 20 passages survive the trim from the end:
+# about 10 at 12288, all 20 on most questions at 24576. The window alone changes some
+# answers, even on questions where every passage fits, so it is part of the row's
+# definition and each window is a separate run.
 chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
 collection_name: docling_hybrid_1024_bge-m3
 retriever: replay
