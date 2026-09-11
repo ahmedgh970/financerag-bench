@@ -57,8 +57,17 @@ def _build_reranked(cfg) -> Retriever:
     )
 
 
+def _build_replay(cfg) -> Retriever:
+    from src.retrieval.replay import ReplayRetriever
+
+    if not getattr(cfg, "replay_path", None):
+        raise ValueError("retriever 'replay' requires 'replay_path' to be set")
+    return ReplayRetriever(cfg.replay_path)
+
+
 _BUILDERS: dict[str, Callable[[object], Retriever]] = {
     "dense": _build_dense,
+    "replay": _build_replay,
     "bm25": _build_bm25,
     "hybrid": _build_hybrid,
     "reranked": _build_reranked,

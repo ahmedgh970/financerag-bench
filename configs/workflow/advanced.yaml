@@ -1,0 +1,22 @@
+# Ablation baseline: the same stored retrieval, every node disabled -> retrieve then
+# generate. Before trimming, its prompt is byte-identical to the naive pipeline's.
+#
+# The pinned num_ctx decides how many of the 20 passages survive the trim from the end:
+# about 10 at 12288, all 20 on most questions at 24576. The window alone changes some
+# answers, even on questions where every passage fits, so it is part of the row's
+# definition and each window is a separate run.
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+collection_name: docling_hybrid_1024_bge-m3
+retriever: replay
+replay_path: data/processed/prompts/prompts_reranked-dense_docling_hybrid_1024_bge-m3_docscoped_pf50_k20.jsonl
+doc_scoped: true
+k: 20
+grading:
+  enabled: false
+calculator:
+  enabled: false
+llm:
+  model: ollama_chat/granite4.1:8b
+  temperature: 0.0
+  max_tokens: 1024
+  num_ctx: 24576

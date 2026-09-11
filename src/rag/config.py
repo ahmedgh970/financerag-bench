@@ -29,6 +29,10 @@ class RagConfig(BaseModel):
     )
     k: int = 10
 
+    # Only used when retriever == "replay": a materialised retrieval to serve instead
+    # of recomputing one, so several configurations share byte-identical passages.
+    replay_path: str | None = None
+
     # Only used when retriever == "reranked".
     base_retriever: str | None = None
     reranker_model: str = "BAAI/bge-reranker-v2-m3"

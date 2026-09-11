@@ -10,11 +10,15 @@ a bad request fails immediately since retrying can't help.
 from __future__ import annotations
 
 import os
+from typing import TypeVar
 
 import requests
+from pydantic import BaseModel, ValidationError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from src.llm.config import LLMConfig
+
+T = TypeVar("T", bound=BaseModel)
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
@@ -39,15 +43,19 @@ def _model_name(model: str) -> str:
     return model.split("/", 1)[1] if "/" in model else model
 
 
-def _auto_num_ctx(prompt: str, num_predict: int) -> int:
-    """Size the context window to the prompt so retrieved chunks aren't truncated.
+def estimated_context(prompt: str, num_predict: int) -> int:
+    """Context a prompt needs: ~len/3 tokens, plus the output budget and a margin.
 
-    Estimates prompt tokens as ~len/3 (conservative for the number-dense financial
-    text, which tokenizes denser than prose), adds the output budget and a small
-    margin, rounds up to 512, and caps at ``NUM_CTX_CAP``.
+    len/3 is deliberately conservative for number-dense financial text, which
+    tokenizes denser than prose. Shared with the workflow, which uses it to decide
+    how many passages fit a pinned context rather than letting Ollama truncate.
     """
-    est = len(prompt) // 3 + num_predict + 256
-    rounded = ((est + 511) // 512) * 512
+    return len(prompt) // 3 + num_predict + 256
+
+
+def _auto_num_ctx(prompt: str, num_predict: int) -> int:
+    """Size the context window to the prompt so retrieved chunks aren't truncated."""
+    rounded = ((estimated_context(prompt, num_predict) + 511) // 512) * 512
     return min(NUM_CTX_CAP, max(2048, rounded))
 
 
@@ -56,29 +64,55 @@ def _auto_num_ctx(prompt: str, num_predict: int) -> int:
     stop=stop_after_attempt(4),
     wait=wait_exponential(multiplier=1, min=2, max=20),
 )
-def generate(prompt: str, config: LLMConfig) -> str:
+def generate(prompt: str, config: LLMConfig, schema: dict | None = None) -> str:
     """Generate a completion for ``prompt`` on a local Ollama model.
 
     ``think: False`` disables the reasoning channel on thinking-capable models
     (qwen3.5, gemma4): left on, their chain-of-thought is emitted first and can
     exhaust ``num_predict`` before any answer token, returning empty content.
     Plain-instruct models ignore the flag, so it is always safe to send.
+
+    ``schema`` is a JSON Schema passed to Ollama's ``format`` field: decoding is then
+    constrained to emit a matching JSON object. Use :func:`generate_structured` for
+    the typed version.
     """
     num_ctx = config.num_ctx or _auto_num_ctx(prompt, config.max_tokens)
-    response = requests.post(
-        f"{OLLAMA_URL}/api/chat",
-        json={
-            "model": _model_name(config.model),
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": False,
-            "think": False,
-            "options": {
-                "temperature": config.temperature,
-                "num_predict": config.max_tokens,
-                "num_ctx": num_ctx,
-            },
+    payload: dict = {
+        "model": _model_name(config.model),
+        "messages": [{"role": "user", "content": prompt}],
+        "stream": False,
+        "think": False,
+        "options": {
+            "temperature": config.temperature,
+            "num_predict": config.max_tokens,
+            "num_ctx": num_ctx,
         },
-        timeout=1800,
-    )
+    }
+    if schema is not None:
+        payload["format"] = schema
+    response = requests.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=1800)
     response.raise_for_status()
     return response.json().get("message", {}).get("content", "")
+
+
+class StructuredOutputError(ValueError):
+    """Ollama returned something that does not validate against the requested schema.
+
+    Constrained decoding makes this rare, but it stays possible (an empty response
+    when the output budget runs out, for instance), so callers must handle it rather
+    than assume a valid object.
+    """
+
+
+def generate_structured(prompt: str, config: LLMConfig, model: type[T]) -> T:
+    """Generate a JSON object constrained to ``model``'s schema and validate it.
+
+    Note the trade-off of constrained decoding: the model is forced to emit a valid
+    object, so abstention has to be *representable in the schema* (a list of booleans
+    that can be all-false, say) rather than expressed by refusing to answer.
+    """
+    raw = generate(prompt, config, schema=model.model_json_schema())
+    try:
+        return model.model_validate_json(raw)
+    except ValidationError as e:
+        raise StructuredOutputError(f"invalid structured output: {raw[:300]!r}") from e
