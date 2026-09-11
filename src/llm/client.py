@@ -64,7 +64,9 @@ def _auto_num_ctx(prompt: str, num_predict: int) -> int:
     stop=stop_after_attempt(4),
     wait=wait_exponential(multiplier=1, min=2, max=20),
 )
-def generate(prompt: str, config: LLMConfig, schema: dict | None = None) -> str:
+def generate(
+    prompt: str, config: LLMConfig, schema: dict | None = None, system: str | None = None
+) -> str:
     """Generate a completion for ``prompt`` on a local Ollama model.
 
     ``think: False`` disables the reasoning channel on thinking-capable models
@@ -75,11 +77,17 @@ def generate(prompt: str, config: LLMConfig, schema: dict | None = None) -> str:
     ``schema`` is a JSON Schema passed to Ollama's ``format`` field: decoding is then
     constrained to emit a matching JSON object. Use :func:`generate_structured` for
     the typed version.
+
+    ``system``, when given, is sent as a system turn before the prompt -- for models
+    trained on a fixed system prompt, such as the Prometheus judge.
     """
     num_ctx = config.num_ctx or _auto_num_ctx(prompt, config.max_tokens)
+    messages = [{"role": "user", "content": prompt}]
+    if system is not None:
+        messages.insert(0, {"role": "system", "content": system})
     payload: dict = {
         "model": _model_name(config.model),
-        "messages": [{"role": "user", "content": prompt}],
+        "messages": messages,
         "stream": False,
         "think": False,
         "options": {

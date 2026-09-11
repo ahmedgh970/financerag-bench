@@ -56,3 +56,14 @@ def test_generate_strips_prefix_and_disables_thinking(monkeypatch):
     assert captured["think"] is False
     assert captured["options"]["temperature"] == 0.0
     assert captured["url"].endswith("/api/chat")
+
+
+def test_generate_sends_a_system_turn_only_when_asked(monkeypatch):
+    captured = _capture_post(monkeypatch)
+    generate("hi", LLMConfig())
+    assert [m["role"] for m in captured["messages"]] == ["user"]
+
+    captured = _capture_post(monkeypatch)
+    generate("hi", LLMConfig(), system="You are a judge.")
+    assert captured["messages"][0] == {"role": "system", "content": "You are a judge."}
+    assert captured["messages"][1] == {"role": "user", "content": "hi"}

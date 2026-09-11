@@ -1,28 +1,26 @@
-"""Prometheus-2 judge: native Absolute Grading of a generated answer vs gold.
+"""Prometheus protocol: native Absolute Grading of a generated answer vs gold.
 
-Unlike the correct/grounded judge in ``judge.py``, this scores each answer on
-Prometheus-2's own 1-5 rubric scale (a single integer plus written feedback),
-using the exact Absolute Grading protocol the model was trained on
-(prometheus-eval): a task description, the instruction, the response, a
-reference answer worth a score of 5, and a score rubric. The model is served
-locally through Ollama; its Modelfile already carries the required system
-prompt and Mistral ``[INST]`` template, so we send the assembled prompt as the
-user turn and read back ``Feedback: ... [RESULT] N``.
+Unlike the correct/grounded protocol, this scores each answer on Prometheus-2's
+own 1-5 rubric scale (a single integer plus written feedback), using the exact
+Absolute Grading protocol the model was trained on (prometheus-eval): a task
+description, the instruction, the response, a reference answer worth a score of 5,
+and a score rubric, read back as ``Feedback: ... [RESULT] N``. Deviating from that
+prompt degrades the fine-tuned model, so it only makes sense with a Prometheus
+model (ADR 0003).
 
-The 1-5 score is a different axis from the correct/grounded judge, not a
+The 1-5 score is a different axis from the correct/grounded verdict, not a
 remapping of it: the two judges are compared by the model *ranking* they induce
-(Spearman/Kendall), not question-by-question.
+(Spearman/Kendall), not question by question.
 """
 
 from __future__ import annotations
 
-import os
 import re
+from collections import Counter
+from statistics import mean
 
-import requests
-
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
-PROMETHEUS_MODEL = "ggozad/prometheus2:latest"
+from src.llm.client import generate
+from src.llm.config import LLMConfig
 
 # Baked into the model's Modelfile too; sent explicitly so the call is
 # self-contained and does not rely on the server default.
@@ -94,35 +92,24 @@ def parse_score(text: str) -> int | None:
     return int(matches[-1]) if matches else None
 
 
-def judge_prometheus(
-    question: str,
-    gold_answer: str,
-    generated_answer: str,
-    model: str = PROMETHEUS_MODEL,
-    ollama_url: str = OLLAMA_URL,
-    timeout: float = 600.0,
-) -> dict:
-    """Grade one generated answer against gold on Prometheus-2's 1-5 rubric.
+def judge(record: dict, llm: LLMConfig) -> dict:
+    """Grade one answer record on the 1-5 rubric.
 
-    Returns ``{"score": int | None, "feedback": str, "raw": str}``. ``score`` is
-    ``None`` when the model's output can't be parsed.
+    Returns ``{"score": int | None, "feedback": str}``; ``score`` is ``None`` when
+    the model's output can't be parsed, so the caller can count and inspect those.
     """
-    prompt = build_absolute_prompt(question, gold_answer, generated_answer)
-    r = requests.post(
-        f"{ollama_url}/api/chat",
-        json={
-            "model": model,
-            "messages": [
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": prompt},
-            ],
-            "stream": False,
-            "keep_alive": "30m",
-            "options": {"temperature": 0},
-        },
-        timeout=timeout,
-    ).json()
-    raw = r.get("message", {}).get("content", "")
-    score = parse_score(raw)
+    prompt = build_absolute_prompt(
+        record["question"], record["gold_answer"], record["generated_answer"]
+    )
+    raw = generate(prompt, llm, system=_SYSTEM_PROMPT)
     feedback = raw.split("[RESULT]", 1)[0].removeprefix("Feedback:").strip()
-    return {"score": score, "feedback": feedback, "raw": raw}
+    return {"score": parse_score(raw), "feedback": feedback}
+
+
+def summarize(verdicts: list[dict]) -> str:
+    """One line: mean score, score distribution, and how many outputs failed to parse."""
+    scores = [v["score"] for v in verdicts if v["score"] is not None]
+    unparsed = len(verdicts) - len(scores)
+    avg = f"{mean(scores):.2f}" if scores else "n/a"
+    dist = dict(sorted(Counter(scores).items()))
+    return f"mean {avg} | distribution {dist}" + (f" | {unparsed} UNPARSED" if unparsed else "")

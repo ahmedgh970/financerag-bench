@@ -1,0 +1,12 @@
+# LLM judge, Prometheus-2 Absolute Grading protocol (ADR 0003): one 1-5 score plus
+# feedback per answer, validated as a reproducible local judge at the ranking level.
+# The prompt is prometheus-eval's, verbatim, so this protocol only runs a Prometheus model.
+#   make judge JUDGE=prometheus
+#   make judge JUDGE=prometheus ANSWERS='data/processed/answers/naif_rag/*_k20.jsonl'
+answers_path: data/processed/answers/naif_rag/reranked_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20.jsonl
+protocol: prometheus
+name: prometheus  # -> ..._judged_by_prometheus.jsonl, the files ADR 0003 was built on
+llm:
+  model: ollama_chat/ggozad/prometheus2:latest
+  temperature: 0.0
+  num_ctx: 8192  # the window ADR 0003's verdicts were produced with

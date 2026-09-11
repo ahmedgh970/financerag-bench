@@ -24,7 +24,7 @@ from src.evaluation.common.golden_set import load_golden_set  # noqa: E402
 from src.evaluation.common.io import read_jsonl  # noqa: E402
 from src.evaluation.common.matching import build_page_index, resolve_evidence_page  # noqa: E402
 from src.evaluation.common.schema import QAItem  # noqa: E402
-from src.evaluation.grounding import evidence_retrieved  # noqa: E402
+from src.evaluation.judge.grid import evidence_retrieved  # noqa: E402
 
 
 def render_question(
