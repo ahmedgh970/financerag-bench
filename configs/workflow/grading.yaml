@@ -1,0 +1,30 @@
+# Ablation row: the stored reranked(dense, prefetch 50) retrieval at k=20, graded 0-3.
+#
+# Retrieval is replayed from prompts materialised in July rather than recomputed. It is
+# deterministic, so replaying it changes nothing about what the generator sees -- the
+# prompt built from these passages is byte-identical to the one the naive pipeline used
+# (verified on all 150 questions) -- while removing the embedder and the cross-encoder
+# from the run entirely. Every row replaying this file therefore sees exactly the same
+# passages, and the whole GPU is left to the generator.
+#
+# Measured on the same 36 questions, this retrieval is worth about 19 points of
+# equivalent over dense top-20: presence of the evidence is not the same thing as
+# having it ranked where the model will use it.
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+collection_name: docling_hybrid_1024_bge-m3
+retriever: replay
+replay_path: data/processed/prompts/prompts_reranked-dense_docling_hybrid_1024_bge-m3_docscoped_pf50_k20.jsonl
+doc_scoped: true
+k: 20
+grading:
+  enabled: true
+  keep_threshold: 2   # UMBRELA: 2 = holds part of what the answer is built from
+  min_chunks: 3       # 0 = no floor, 1 = rescue an empty selection only, 3 = always three
+  low_confidence_below: 2
+calculator:
+  enabled: false
+llm:
+  model: ollama_chat/granite4.1:8b
+  temperature: 0.0
+  max_tokens: 1024
+  num_ctx: 12288

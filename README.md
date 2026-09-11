@@ -80,6 +80,31 @@ ablation and analysis in [ADR 0002](docs/adr/0002-generation-model.md):
 Key finding: **useful retrieval depth scales with model capability** — the
 k10→k20 step only helps the strongest models (flat for the 3B tier). See ADR 0002.
 
+**CRAG workflow.** The deterministic LangGraph workflow (`src/workflow/`) replays
+the same `reranked(dense)` top-20 passages for every row and generates with
+`granite4.1:8b`. Each answer is placed in one of four outcomes, based on whether
+the gold evidence page actually reached the prompt:
+
+- **Good job**: correct and grounded.
+- **Hallucinating**: answers without the evidence.
+- **Need help**: wrong although the evidence was in the prompt.
+- **Don't know**: refusal.
+
+Full grid, per-question transitions and failure analysis are in
+[ADR 0004](docs/adr/0004-crag-workflow-evidence-grid.md).
+
+| Workflow row | Good job | Hallucinating | Need help | Don't know | Evidence in prompt | Latency / Q | LLM calls / Q |
+|---|---|---|---|---|---|---|---|
+| advanced, `num_ctx` 12288 (~10 passages) | 79 | 32 | 16 | 23 | 93 | 107 s | 1 |
+| grading 0–3 + floor of 3, `num_ctx` 12288 | 83 | 31 | 14 | 22 | 92 | 161 s | 20.9 |
+| **advanced, `num_ctx` 24576 (~20 passages)** | **88** | **21** | 22 | **19** | **105** | 187 s | 1 |
+
+Key finding: the larger window is the best row, but only 4 of its 16 gains over
+the 12K window come from newly retrieved evidence. The rest reflect how
+sensitive generation is to the surrounding context. With more evidence in
+context, failures shift from *hallucinating* to *need help*: the generator,
+not the retrieval, is now the bottleneck on those questions.
+
 ---
 
 ## Generation benchmark — local LLM lineup
@@ -185,13 +210,15 @@ generator falls back to CPU when both compete for VRAM.
 ```
 financerag-bench/
 ├── README.md
-├── docs/                          # ADRs, benchmark reports
+├── docs/                          # ADRs (tracked); measurement dumps kept local
 ├── configs/                       # 1 YAML = 1 reproducible experiment, grouped by stage
 │   ├── parse/
 │   ├── chunk/
 │   ├── index/
 │   ├── eval/
-│   └── rag/                       # naive RAG: retriever × LLM × k
+│   ├── rag/                       # naive RAG: retriever × LLM × k
+│   ├── workflow/                  # CRAG workflow rows (advanced, grading, controls)
+│   └── judge/                     # llm_judge + evidence_grid; pick the run with ANSWERS=
 ├── data/
 │   ├── pdfs/                      # 368 docs
 │   ├── jsons/                     # 150 QA pairs (FinanceBench open-source)
@@ -202,11 +229,11 @@ financerag-bench/
 │   ├── indexing/                  # offline job: chunks -> embeddings -> Qdrant
 │   ├── retrieval/                 # dense, BM25, hybrid, reranker
 │   ├── llm/                       # Ollama client + versioned prompts
-│   ├── rag/                       # pipelines: naive → advanced → agentic
-│   ├── agents/                    # LangGraph: router, grader, rewriter
-│   ├── evaluation/                # retrieval metrics + Ragas + runner
+│   ├── rag/                       # naive pipeline: retrieve once, generate once
+│   ├── workflow/                  # deterministic CRAG graph (LangGraph): grading, context trimming
+│   ├── agents/                    # ReAct agent (final comparison tier)
+│   ├── evaluation/                # retrieval metrics, outcome grid, Ragas, runners
 │   └── api/                       # FastAPI
-├── benchmarks/                    # results (JSON/CSV) versioned
 ├── dashboard/                     # Streamlit benchmark explorer
 ├── tests/                         # pytest (unit + integration + eval regression)
 ├── .github/workflows/             # CI: lint, format check, fast tests
