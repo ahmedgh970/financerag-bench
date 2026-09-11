@@ -15,20 +15,16 @@ on a gold page are flagged. Meant to be read question by question, never truncat
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.evaluation.golden_set import load_golden_set  # noqa: E402
+from src.evaluation.common.golden_set import load_golden_set  # noqa: E402
+from src.evaluation.common.io import read_jsonl  # noqa: E402
+from src.evaluation.common.matching import build_page_index, resolve_evidence_page  # noqa: E402
+from src.evaluation.common.schema import QAItem  # noqa: E402
 from src.evaluation.grounding import evidence_retrieved  # noqa: E402
-from src.evaluation.matching import build_page_index, resolve_evidence_page  # noqa: E402
-from src.evaluation.schema import QAItem  # noqa: E402
-
-
-def _read(path: str) -> list[dict]:
-    return [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
 
 
 def render_question(
@@ -90,10 +86,11 @@ def main() -> None:
     args = parser.parse_args()
 
     justifications = {
-        rec["financebench_id"]: rec.get("justification") or "" for rec in _read(args.golden_set)
+        rec["financebench_id"]: rec.get("justification") or ""
+        for rec in read_jsonl(args.golden_set)
     }
     qas = {qa.id: qa for qa in load_golden_set(args.golden_set)}
-    runs = {name: _read(path) for name, path in (a.split("=", 1) for a in args.answers)}
+    runs = {name: read_jsonl(path) for name, path in (a.split("=", 1) for a in args.answers)}
     order = [r["id"] for r in next(iter(runs.values()))]
     by_id = {name: {r["id"]: r for r in rs} for name, rs in runs.items()}
     page_index = build_page_index(args.chunks, {qas[i].doc_name for i in order})

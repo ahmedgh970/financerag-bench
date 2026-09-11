@@ -4,11 +4,11 @@ import json
 
 import pytest
 
+from src.evaluation.common.matching import resolve_evidence_page
+from src.evaluation.common.schema import Evidence, QAItem
 from src.evaluation.config import GridConfig
 from src.evaluation.grid_runner import _verdicts_path, grade, run
 from src.evaluation.grounding import Outcome, evidence_retrieved, outcome
-from src.evaluation.matching import resolve_evidence_page
-from src.evaluation.schema import Evidence, QAItem
 
 EVIDENCE = "Purchases of property, plant and equipment (1,577) (1,373)"
 

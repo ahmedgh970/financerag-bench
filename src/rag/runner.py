@@ -19,8 +19,8 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from src.evaluation.golden_set import load_golden_set
-from src.evaluation.schema import QAItem
+from src.evaluation.common.golden_set import load_golden_set
+from src.evaluation.common.schema import QAItem
 from src.rag.config import RagConfig, load_rag_config
 from src.rag.naive import answer
 from src.retrieval.registry import build_retriever

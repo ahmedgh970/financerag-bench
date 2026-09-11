@@ -4,7 +4,7 @@ A generated answer is only trustworthy if it is right *and* justified by the
 passages the generator actually saw. Grounding is therefore measured against
 the retrieved context, not against the model's reasoning, and with the same
 relevance definition as the retrieval metrics: each gold evidence is resolved
-to its physical page (:mod:`src.evaluation.matching`), and it counts as
+to its physical page (:mod:`src.evaluation.common.matching`), and it counts as
 retrieved when a chunk of that page reached the prompt.
 
 Combined with a judge's reading of the answer, every record falls in exactly

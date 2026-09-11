@@ -14,49 +14,28 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 from pathlib import Path
 
 from tqdm import tqdm
 
+from src.evaluation.common.io import append_jsonl, derived_path, done_ids, read_jsonl, select
 from src.evaluation.config import RagasConfig, load_ragas_config
 from src.evaluation.ragas_eval import build_metrics, score_record
 
 
-def _scored_ids(path: Path) -> set[str]:
-    """QA ids already scored in ``path`` (empty set if it doesn't exist yet)."""
-    if not path.exists():
-        return set()
-    with path.open(encoding="utf-8") as f:
-        return {json.loads(line)["id"] for line in f if line.strip()}
-
-
-def _load_records(path: str, qa_id: str | None, limit: int | None) -> list[dict]:
-    """Answer records from ``path`` -- just ``qa_id``, or the first ``limit``."""
-    records = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
-    if qa_id is not None:
-        selected = [r for r in records if r["id"] == qa_id]
-        if not selected:
-            raise SystemExit(f"No answer with id {qa_id!r} in {path!r}.")
-        return selected
-    return records[:limit] if limit is not None else records
-
-
 def _output_path(config: RagasConfig) -> Path:
     """One file per (answers file, Ragas LLM) combination."""
-    model = config.llm.model.replace("/", "_")
-    answers_name = Path(config.answers_path).stem
-    return Path("data/processed/ragas") / f"{answers_name}_ragas_by_{model}.jsonl"
+    return derived_path(config.answers_path, "data/processed/ragas", f"ragas_by_{config.llm.model}")
 
 
 def run(config: RagasConfig, qa_id: str | None = None, limit: int | None = None) -> str:
     """Score every not-yet-scored answer (or just ``qa_id``/``limit``) and append to a JSONL."""
-    records = _load_records(config.answers_path, qa_id, limit)
+    records = select(read_jsonl(config.answers_path), qa_id, limit)
 
     out_path = _output_path(config)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    done = _scored_ids(out_path)
+    done = done_ids(out_path)
     remaining = [r for r in records if r["id"] not in done]
     if not remaining:
         print(f"All {len(records)} answers already scored -> {out_path}")
@@ -65,14 +44,11 @@ def run(config: RagasConfig, qa_id: str | None = None, limit: int | None = None)
     metrics = build_metrics(config.llm, config.embedding_model, config.metrics)
 
     totals: dict[str, float] = {}
-    with out_path.open("a", encoding="utf-8") as f:
-        for r in tqdm(remaining, desc="ragas"):
-            scores = score_record(r, metrics)
-            record = {"id": r["id"], "question": r["question"], **scores}
-            f.write(json.dumps(record) + "\n")
-            f.flush()
-            for k, v in scores.items():
-                totals[k] = totals.get(k, 0.0) + v
+    for r in tqdm(remaining, desc="ragas"):
+        scores = score_record(r, metrics)
+        append_jsonl(out_path, {"id": r["id"], "question": r["question"], **scores})
+        for k, v in scores.items():
+            totals[k] = totals.get(k, 0.0) + v
 
     n = len(remaining)
     summary = " | ".join(f"{k}={v / n:.3f}" for k, v in totals.items())

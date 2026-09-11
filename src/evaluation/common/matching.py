@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
-from src.evaluation.schema import QAItem
+from src.evaluation.common.schema import QAItem
 from src.ingestion.schema import Chunk
 from src.ingestion.storage import read_chunks
 

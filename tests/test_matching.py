@@ -1,7 +1,7 @@
 """Fast unit tests for evidence->chunk matching (no corpus needed)."""
 
-from src.evaluation.matching import is_relevant, resolve_gold_pages
-from src.evaluation.schema import Evidence, QAItem
+from src.evaluation.common.matching import is_relevant, resolve_gold_pages
+from src.evaluation.common.schema import Evidence, QAItem
 from src.ingestion.schema import Chunk
 
 
