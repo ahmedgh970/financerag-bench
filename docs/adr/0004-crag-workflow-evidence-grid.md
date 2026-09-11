@@ -46,7 +46,7 @@ grille classe chaque réponse dans **une** des quatre catégories :
 | **Dont know** | Refus / « le contexte ne contient pas… » (prioritaire ; on note à côté si l'evidence était présente) |
 
 **Evidence présente (critère A)** : chaque evidence gold est résolue sur sa page
-physique par `src/evaluation/matching.py`, la **même** définition que le
+physique par `src/evaluation/common/matching.py`, la **même** définition que le
 recall@k du retrieval (ADR 0001). Un passage de **chaque** page gold doit figurer
 dans les `sources` réellement envoyées au générateur. C'est calculé par code, sans
 seuil. Un diagnostic de recouvrement mots / chiffres avec la page gold a été
@@ -59,7 +59,7 @@ suffit.
 une : réponse **entière**, vérifiée contre les **passages du prompt**, avec le
 verdict des autres runs sous les yeux pour rester cohérent. Le juge ne fournit
 que `correct` / `refused` / `alt_supported` + une justification spécifique ;
-`src/evaluation/grid_runner.py` calcule l'evidence et la catégorie.
+`src/evaluation/judge/grid.py` calcule l'evidence et la catégorie.
 
 **Règles de cohérence appliquées aux trois runs** :
 
@@ -180,17 +180,18 @@ retrieval constant.
 ## Conséquences
 
 - **Code** :
-  - `src/evaluation/grounding.py` : evidence présente (critère A) et règle de
-    catégorie ;
-  - `src/evaluation/grid_runner.py` + `GridConfig` : jointure réponses /
-    verdicts / golden set, échec si un verdict manque ;
-  - `src/evaluation/matching.py` : résolution des pages gold, partagée avec le
-    runner de retrieval ;
+  - `src/evaluation/judge/grid.py` : evidence présente (critère A), règle de
+    catégorie, et jointure réponses / verdicts / golden set, en échec si un
+    verdict manque ;
+  - `src/evaluation/run_judge.py grid` : écrit la grille et affiche ses
+    comptes ;
+  - `src/evaluation/common/matching.py` : résolution des pages gold, partagée
+    avec l'évaluation du retrieval ;
   - `scripts/judge_view.py` : vue de jugement par question (réponses entières,
     sources, passages) ;
-  - `configs/judge/evidence_grid.yaml` : une seule config pour tous les runs,
-    le run étant choisi par `make grid ANSWERS=<answers.jsonl>` ; les verdicts
-    sont retrouvés d'après le nom du fichier de réponses.
+  - `configs/evaluation/judge/evidence_grid.yaml` : une seule config pour tous
+    les runs, le run étant choisi par `make grid ANSWERS=<answers.jsonl>` ; les
+    verdicts sont retrouvés d'après le nom du fichier de réponses.
 - **Données** (locales, non versionnées) :
   - verdicts dans
     `data/processed/judged/verdicts/{answers_stem}.claude.jsonl` ;

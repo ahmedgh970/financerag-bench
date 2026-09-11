@@ -1,0 +1,9 @@
+# Evidence-grounded outcome grid (good_job / hallucinating / need_help / dont_know, ADR 0004).
+# One config for every judged run: pick the run with ANSWERS=; its verdicts are read from
+# data/processed/judged/verdicts/{answers stem}.{judge_model}.jsonl.
+#   make grid
+#   make grid ANSWERS=data/processed/answers/workflow_grading_replay_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20.jsonl
+# Default run: the workflow advanced row at num_ctx 24576, the current reference.
+answers_path: data/processed/answers/workflow_advanced_replay_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20.jsonl
+chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
+judge_model: claude

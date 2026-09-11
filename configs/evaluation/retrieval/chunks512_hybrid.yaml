@@ -1,0 +1,6 @@
+# Retrieval eval on the docling-hybrid-512 corpus. Hybrid retrieval: dense + BM25 fused by weighted Reciprocal Rank Fusion, doc-scoped.
+# make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_hybrid.yaml
+chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
+collection_name: docling_hybrid_512_bge-m3
+retriever: hybrid
+doc_scoped: true

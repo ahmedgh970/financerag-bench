@@ -159,7 +159,7 @@ def test_runner_writes_every_field_the_answer_exposes(monkeypatch, tmp_path):
     and neither ruff nor the graph tests caught it -- the failure only surfaced after a
     retriever and a model had been loaded, minutes into a 150-question run.
     """
-    from src.evaluation.schema import QAItem
+    from src.evaluation.common.schema import QAItem
     from src.workflow import runner as runner_mod
 
     qa = QAItem(
