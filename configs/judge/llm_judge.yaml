@@ -1,8 +1,0 @@
-# LLM judge: score an answers file against gold on correct / grounded / equivalent (ADR 0002).
-# One config for every answers file: pick it with --answers (or ANSWERS= with make).
-#   make judge
-#   make judge ANSWERS=data/processed/answers/naif_rag/<run>.jsonl ID=financebench_id_03029
-# Default run: the naive pipeline, reranked(dense) -> granite4.1:8b at k20 (ADR 0002's best row).
-answers_path: data/processed/answers/naif_rag/reranked_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20.jsonl
-llm:
-  model: ollama_chat/llama3.1:8b

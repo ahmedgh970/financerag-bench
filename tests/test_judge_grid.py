@@ -6,9 +6,16 @@ import pytest
 
 from src.evaluation.common.matching import resolve_evidence_page
 from src.evaluation.common.schema import Evidence, QAItem
-from src.evaluation.config import GridConfig
-from src.evaluation.grid_runner import _verdicts_path, grade, run
-from src.evaluation.grounding import Outcome, evidence_retrieved, outcome
+from src.evaluation.judge.config import GridConfig
+from src.evaluation.judge.grid import (
+    Outcome,
+    build_grid,
+    evidence_retrieved,
+    grade,
+    outcome,
+    verdicts_path,
+)
+from src.evaluation.run_judge import grid
 
 EVIDENCE = "Purchases of property, plant and equipment (1,577) (1,373)"
 
@@ -130,7 +137,7 @@ def test_run_end_to_end(tmp_path, monkeypatch):
         judge_model="claude",
         golden_set_path=str(golden),
     )
-    out = json.loads((tmp_path / run(config)).read_text().splitlines()[0])
+    out = json.loads((tmp_path / grid(config)).read_text().splitlines()[0])
     assert out["evidence_pages"] == [46]
     assert out["outcome"] == "hallucinating"  # right answer, gold page never reached the prompt
 
@@ -141,9 +148,9 @@ def test_verdicts_path_defaults_to_the_answers_stem():
         chunks_path="unused.jsonl",
         judge_model="claude",
     )
-    assert str(_verdicts_path(config)) == "data/processed/judged/verdicts/run_a.claude.jsonl"
+    assert str(verdicts_path(config)) == "data/processed/judged/verdicts/run_a.claude.jsonl"
     explicit = config.model_copy(update={"verdicts_path": "elsewhere.jsonl"})
-    assert str(_verdicts_path(explicit)) == "elsewhere.jsonl"
+    assert str(verdicts_path(explicit)) == "elsewhere.jsonl"
 
 
 def test_run_refuses_to_grade_with_missing_verdicts(tmp_path):
@@ -158,4 +165,4 @@ def test_run_refuses_to_grade_with_missing_verdicts(tmp_path):
         judge_model="claude",
     )
     with pytest.raises(SystemExit):
-        run(config)
+        build_grid(config)
