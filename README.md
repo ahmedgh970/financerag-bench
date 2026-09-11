@@ -166,7 +166,7 @@ make chunk CONFIG=configs/chunk/docling_hybrid_512.yaml
 make index CONFIG=configs/index/docling_hybrid_512.yaml
 
 # 4. Evaluate retrieval quality
-make eval CONFIG=configs/eval/hybrid512_reranked_dense.yaml
+make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_reranked_dense.yaml
 
 # 5. Generate answers with the RAG pipeline (local Ollama, no quota)
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml                            # all 150 QA

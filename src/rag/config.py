@@ -14,7 +14,7 @@ from src.llm.config import LLMConfig
 class RagConfig(BaseModel):
     """Parameters of a naive RAG run: build a retriever, answer every QA, save results.
 
-    The retrieval fields mirror ``EvalConfig`` so the same YAML shape plugs
+    The retrieval fields mirror ``RetrievalEvalConfig`` so the same YAML shape plugs
     straight into ``build_retriever``.
     """
 

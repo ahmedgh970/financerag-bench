@@ -1,7 +1,7 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge grid ragas prompts generate judge-all chunk-dist serve demo docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index answer eval-retrieval judge grid ragas prompts generate judge-all chunk-dist serve demo docker-up docker-down clean
 
 PYTHON := python
-CONFIG ?= configs/eval/hybrid512_dense.yaml
+CONFIG ?= configs/evaluation/retrieval/chunks512_dense.yaml
 # CONFIG when given on the command line, else the stage's own default config.
 stage_config = $(if $(filter command line,$(origin CONFIG)),$(CONFIG),$(1))
 
@@ -17,7 +17,7 @@ help:
 	@echo "  make parse          Parse corpus once -> data/processed/PARSER/parsed/ (CONFIG=...)"
 	@echo "  make chunk          Chunk parsed docs -> chunks.jsonl (CONFIG=...)"
 	@echo "  make index          Embed chunks.jsonl -> Qdrant collection (CONFIG=...)"
-	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
+	@echo "  make eval-retrieval Score a retriever: recall@k / MRR / nDCG -> docs/benchmarks/ (CONFIG=configs/evaluation/retrieval/...yaml)"
 	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=..., optional ID=<qa_id> for one question)"
 	@echo "  make judge          LLM-judge an answers file against gold -> data/processed/judged/ (optional ANSWERS=<answers.jsonl>, ID=<qa_id>)"
 	@echo "  make grid           Place judged answers in the evidence-grounded outcome grid -> data/processed/judged/ (optional ANSWERS=<answers.jsonl>)"
@@ -61,8 +61,8 @@ chunk:
 index:
 	uv run python -m src.indexing.runner --config $(CONFIG)
 
-eval:
-	uv run python -m src.evaluation.runner --config $(CONFIG)
+eval-retrieval:
+	uv run python -m src.evaluation.run_retrieval --config $(CONFIG)
 
 answer:
 	uv run python -m src.rag.runner --config $(CONFIG) $(if $(ID),--id $(ID),)

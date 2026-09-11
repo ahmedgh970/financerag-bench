@@ -1,0 +1,6 @@
+# Retrieval eval on the docling-hybrid-512 corpus. BM25 lexical retrieval, doc-scoped.
+# make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_bm25.yaml
+chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
+collection_name: docling_hybrid_512_bge-m3
+retriever: bm25
+doc_scoped: true
