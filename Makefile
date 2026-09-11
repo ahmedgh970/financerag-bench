@@ -1,7 +1,9 @@
-.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge ragas prompts generate judge-all chunk-dist serve demo docker-up docker-down clean
+.PHONY: help install install-all lint format test test-fast parse chunk index eval answer judge grid ragas prompts generate judge-all chunk-dist serve demo docker-up docker-down clean
 
 PYTHON := python
 CONFIG ?= configs/eval/hybrid512_dense.yaml
+# CONFIG when given on the command line, else the stage's own default config.
+stage_config = $(if $(filter command line,$(origin CONFIG)),$(CONFIG),$(1))
 
 help:
 	@echo "financerag-bench — available commands:"
@@ -17,7 +19,8 @@ help:
 	@echo "  make index          Embed chunks.jsonl -> Qdrant collection (CONFIG=...)"
 	@echo "  make eval           Run evaluation (CONFIG=configs/...yaml)"
 	@echo "  make answer         Run the naive RAG pipeline on the 150 QA -> data/processed/answers/ (CONFIG=..., optional ID=<qa_id> for one question)"
-	@echo "  make judge          Judge an answers file against gold -> data/processed/judged/ (CONFIG=..., optional ID=<qa_id> for one question)"
+	@echo "  make judge          LLM-judge an answers file against gold -> data/processed/judged/ (optional ANSWERS=<answers.jsonl>, ID=<qa_id>)"
+	@echo "  make grid           Place judged answers in the evidence-grounded outcome grid -> data/processed/judged/ (optional ANSWERS=<answers.jsonl>)"
 	@echo "  make ragas          Score an answers file with Ragas -> data/processed/ragas/ (CONFIG=..., optional ID=<qa_id> or LIMIT=<n>)"
 	@echo "  make prompts        Pre-materialize generation prompts per question x k -> data/processed/prompts/ (optional LIMIT=<n>)"
 	@echo "  make generate       Run the local Ollama lineup on materialized prompts -> data/processed/answers/ (optional MODELS=, KS=, LIMIT=)"
@@ -65,7 +68,10 @@ answer:
 	uv run python -m src.rag.runner --config $(CONFIG) $(if $(ID),--id $(ID),)
 
 judge:
-	uv run python -m src.evaluation.judge_runner --config $(CONFIG) $(if $(ID),--id $(ID),)
+	uv run python -m src.evaluation.judge_runner --config $(call stage_config,configs/judge/llm_judge.yaml) $(if $(ANSWERS),--answers $(ANSWERS),) $(if $(ID),--id $(ID),)
+
+grid:
+	uv run python -m src.evaluation.grid_runner --config $(call stage_config,configs/judge/evidence_grid.yaml) $(if $(ANSWERS),--answers $(ANSWERS),)
 
 ragas:
 	uv run python -m src.evaluation.ragas_runner --config $(CONFIG) $(if $(ID),--id $(ID),) $(if $(LIMIT),--limit $(LIMIT),)

@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -21,20 +20,10 @@ from tqdm import tqdm
 
 from src.evaluation.config import EvalConfig, load_eval_config
 from src.evaluation.golden_set import load_golden_set
-from src.evaluation.matching import is_relevant, resolve_gold_pages, words
+from src.evaluation.matching import build_page_index, is_relevant, resolve_gold_pages
 from src.evaluation.metrics import ndcg_at_k, precision_at_k, recall_at_k, reciprocal_rank
-from src.ingestion.storage import read_chunks
 from src.retrieval.base import ScoredChunk
 from src.retrieval.registry import build_retriever
-
-
-def _build_page_index(chunks_path: str, doc_names: set[str]) -> dict[str, dict[int, set[str]]]:
-    """Build {doc: {page: word set}} from the corpus, for the needed docs only."""
-    index: dict[str, dict[int, set[str]]] = defaultdict(lambda: defaultdict(set))
-    for chunk in read_chunks(chunks_path):
-        if chunk.doc_id in doc_names:
-            index[chunk.doc_id][chunk.page] |= words(chunk.text)
-    return index
 
 
 def _dedup_relevances(
@@ -63,7 +52,7 @@ def _score_qa(relevances: list[bool], num_gold: int, k_values: list[int]) -> dic
 def run(config: EvalConfig) -> dict:
     """Run the retrieval evaluation and write a JSON report. Returns the report."""
     qas = load_golden_set(config.golden_set_path)
-    page_index = _build_page_index(config.chunks_path, {q.doc_name for q in qas})
+    page_index = build_page_index(config.chunks_path, {q.doc_name for q in qas})
     retriever = build_retriever(config.retriever, config)
     top_k = max(config.k_values)
 

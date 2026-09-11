@@ -6,8 +6,9 @@ Resumable: ids already judged are skipped and new verdicts are appended, so
 hitting a provider's quota mid-run doesn't lose progress.
 
 Usage:
-    python -m src.evaluation.judge_runner --config configs/judge/llama70b.yaml
-    python -m src.evaluation.judge_runner --config configs/judge/llama70b.yaml --id financebench_id_03029
+    python -m src.evaluation.judge_runner --config configs/judge/llm_judge.yaml
+    python -m src.evaluation.judge_runner --config configs/judge/llm_judge.yaml \
+        --answers data/processed/answers/<run>.jsonl --id financebench_id_03029
 """
 
 from __future__ import annotations
@@ -85,8 +86,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Judge an answers JSONL against gold.")
     parser.add_argument("--config", required=True, help="Path to a judge YAML config.")
     parser.add_argument("--id", help="Judge only this QA id, skipping the rest.")
+    parser.add_argument("--answers", help="Answers JSONL to judge, overriding the config's.")
     args = parser.parse_args()
-    run(load_judge_config(args.config), qa_id=args.id)
+    config = load_judge_config(args.config)
+    if args.answers:
+        config = config.model_copy(update={"answers_path": args.answers})
+    run(config, qa_id=args.id)
 
 
 if __name__ == "__main__":
