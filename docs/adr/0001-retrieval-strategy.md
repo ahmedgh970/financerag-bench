@@ -253,7 +253,7 @@ avant l'ablation complète sur les 150 QA.
 
 ## Conséquences
 
-- L'harnais d'évaluation gagne un flag `doc_scoped` (`EvalConfig`) ; toute
+- L'harnais d'évaluation gagne un flag `doc_scoped` (`RetrievalEvalConfig`) ; toute
   nouvelle expérience doit le préciser explicitement pour rester comparable
   aux résultats ci-dessus.
 - Le retriever hybride expose désormais `prefetch` et des poids par liste

@@ -1,0 +1,6 @@
+# Retrieval eval on the docling-hybrid-512 corpus. Dense retrieval (BGE-M3 + Qdrant cosine), doc-scoped.
+# make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_dense.yaml
+chunks_path: data/processed/docling/chunked/hybrid/chunks_512.jsonl
+collection_name: docling_hybrid_512_bge-m3
+retriever: dense
+doc_scoped: true

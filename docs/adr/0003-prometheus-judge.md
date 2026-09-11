@@ -109,10 +109,14 @@ lit les **moyennes absolues** de Prometheus (le *classement*, lui, tient).
 
 ## Conséquences
 
-- Scripts figés : `src/evaluation/prometheus_judge.py` (protocole verbatim + parse
-  `[RESULT]`), `scripts/prometheus_judge.py` (batch resumable),
-  `scripts/judge_ranking.py` (ρ/τ, auto-découverte des cellules jugées par les
-  deux). Verdicts dans `data/processed/judged/{stem}_judged_by_prometheus.jsonl`.
+- Code figé :
+  - `src/evaluation/judge/protocols/prometheus.py` : protocole verbatim et
+    parse `[RESULT]` ;
+  - `make judge JUDGE=prometheus ANSWERS=...` (config
+    `configs/evaluation/judge/prometheus.yaml`) : batch resumable ;
+  - `scripts/judge_ranking.py` : ρ/τ, avec auto-découverte des cellules jugées
+    par les deux juges.
+- Verdicts dans `data/processed/judged/{stem}_judged_by_prometheus.jsonl`.
 - **Limites assumées** :
   - Prometheus **conflate refus et erreur** (Score 1) → sous-estime les modèles
     honnêtes-timides en valeur absolue ; le ranking n'en souffre pas.
