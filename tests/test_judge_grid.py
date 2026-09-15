@@ -173,7 +173,13 @@ def test_the_grid_protocol_judges_with_the_gold_justification_then_builds_the_gr
 
     def fake_generate_structured(prompt, config, model):
         prompts.append(prompt)
-        return model(justification="1,577 = gold.", refused=False, correct=True)
+        return model(
+            final_answer="$1,577 million",
+            basis="capex line",
+            refused=False,
+            justification="= gold.",
+            correct=True,
+        )
 
     monkeypatch.setattr(grid_protocol, "generate_structured", fake_generate_structured)
     config = _grid_config(tmp_path, llm=LLMConfig(model="ollama_chat/mistral-nemo"))
@@ -195,7 +201,9 @@ def test_a_spot_check_writes_verdicts_but_no_grid(tmp_path, monkeypatch):
     monkeypatch.setattr(
         grid_protocol,
         "generate_structured",
-        lambda prompt, config, model: model(justification="-", refused=True, correct=False),
+        lambda prompt, config, model: model(
+            final_answer="none", basis="-", refused=True, justification="-", correct=False
+        ),
     )
     config = _grid_config(tmp_path, name="judge")
     assert judge(config, qa_id="q1") == verdicts_path(config)
@@ -242,11 +250,19 @@ def test_a_refusal_is_never_correct(monkeypatch):
     monkeypatch.setattr(
         grid_protocol,
         "generate_structured",
-        lambda prompt, config, model: model(justification="-", refused=True, correct=True),
+        lambda prompt, config, model: model(
+            final_answer="none", basis="-", refused=True, justification="-", correct=True
+        ),
     )
     record = {"id": "q1", "question": "q?", "gold_answer": "g", "generated_answer": "a"}
     verdict = grid_protocol.judge(record, LLMConfig())
-    assert verdict == {"correct": False, "refused": True, "justification": "-"}
+    assert verdict == {
+        "correct": False,
+        "refused": True,
+        "final_answer": "none",
+        "basis": "-",
+        "justification": "-",
+    }
 
 
 def test_a_prompt_larger_than_the_pinned_context_is_refused_not_truncated(monkeypatch):
