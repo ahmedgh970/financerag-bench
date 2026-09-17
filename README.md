@@ -1,9 +1,10 @@
-# financerag-bench
+# FinQA Engine — Production-ready agentic RAG for financial document Q&A
+
+[![CI](https://github.com/ahmedgh970/finqa-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedgh970/finqa-engine/actions/workflows/ci.yml) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![License: MIT](https://img.shields.io/github/license/ahmedgh970/finqa-engine)](LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)<br>
+[![Orchestration: LangGraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C?logo=langgraph&logoColor=white)](https://github.com/langchain-ai/langgraph) [![Framework: LangChain](https://img.shields.io/badge/framework-LangChain-1C3C3C?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langchain) [![Vector DB: Qdrant](https://img.shields.io/badge/vector%20DB-Qdrant-4338CA?logo=qdrant&logoColor=white)](https://qdrant.tech/) [![Serving: FastAPI](https://img.shields.io/badge/serving-FastAPI-0F766E?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![Local LLMs: Ollama](https://img.shields.io/badge/local%20LLMs-Ollama-0F766E?logo=ollama&logoColor=white)](https://ollama.com/) [![Parsing: Docling](https://img.shields.io/badge/parsing-Docling-4338CA)](https://github.com/docling-project/docling) [![Dataset: FinanceBench](https://img.shields.io/badge/dataset-FinanceBench-B45309)](https://github.com/patronus-ai/financebench)
 
 > End-to-end RAG & Agentic RAG benchmark on [FinanceBench](https://github.com/patronus-ai/financebench); 150 financial QA pairs, 368 SEC filings (10-K/10-Q).
 > From naive retrieval to multi-agent system, every improvement is justified by a number.
-
-![CI](https://github.com/ahmedgh970/financerag-bench/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -256,7 +257,7 @@ generator falls back to CPU when both compete for VRAM.
 ## Project Structure
 
 ```
-financerag-bench/
+finqa-engine/
 ├── README.md
 ├── docs/                          # ADRs (tracked); measurement dumps kept local
 ├── configs/                       # 1 YAML = 1 reproducible experiment, grouped by stage
