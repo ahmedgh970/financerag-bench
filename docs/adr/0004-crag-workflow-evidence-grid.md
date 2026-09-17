@@ -3,8 +3,10 @@
 ## Statut
 
 Accepté. Amendé le 2026-09-11 : `alt_supported` remplacé par la catégorie
-`unverified` (voir « Amendement » en fin de document ; les chiffres des sections
-Résultats et Analyse sont ceux de la grille d'origine à 4 catégories).
+`unverified` (voir « Amendement du 2026-09-11 » ; les chiffres des sections
+Résultats et Analyse sont ceux de la grille d'origine à 4 catégories). Amendé le
+2026-09-17 : la grille dispose d'un juge local validé, `qwen3.5:9b` (voir
+« Amendement du 2026-09-17 »).
 
 ## Contexte
 
@@ -263,3 +265,86 @@ page gold n'est plus classée `good_job` (appui alternatif) ou `hallucinating`
 - **`need_help` et `dont_know` sont inchangés.**
 
 Les analyses ci-dessus (typologie des échecs, coût du grader) restent valables.
+
+## Amendement du 2026-09-17 : juge local de la grille
+
+**Pourquoi.** Les verdicts de la grille venaient de Claude. Pour que le projet
+soit reproductible par d'autres, la grille doit tourner avec un juge local :
+`make judge` (protocole `grid`, par défaut) écrit les verdicts puis construit la
+grille dans le même run.
+
+**Conception du protocole.**
+
+- **Contexte minimal** : la question, la réponse gold, la justification gold de
+  FinanceBench et la réponse générée entière. Jamais les passages : la présence
+  de l'evidence est calculée par le code (critère A), pas jugée. Le prompt le plus
+  long tient dans `num_ctx` 4 096 ; un prompt qui dépasserait est refusé plutôt que
+  tronqué.
+- **Sortie JSON contrainte par un schéma, remplie dans cet ordre** : `final_answer`
+  (la valeur ou conclusion finale), `basis` (sur quoi elle repose), `refused`,
+  `justification`, puis `correct`. Un refus n'est jamais correct.
+- **Règle « branche alternative »** : 18 questions sur 150 proposent « si la
+  métrique ne convient pas à cette entreprise, dites-le et expliquez pourquoi ».
+  Une réponse qui prend cette branche donne une conclusion, pas un refus.
+
+**Méthode de validation.** La référence est l'ensemble des 450 verdicts de Claude
+sur les trois runs. Le prompt a été mis au point sur **advanced 12K** uniquement ;
+**grading** et **advanced 24K** servent de validation, sans retouche du prompt.
+Seuil d'adoption fixé avant les runs : kappa ≥ 0,8 sur `correct` en validation.
+
+**Itérations.**
+
+| Étape | Juge | Données | κ `correct` | κ `refused` | κ grille | Constat |
+|---|---|---|---:|---:|---:|---|
+| prompt v1 (`correct` d'abord) | mistral-nemo | 3 runs | 0,58 | 0,68 | 0,70 | 26 refus comptés justes (« correctly states that the data is missing ») |
+| prompt v2 (`final_answer`, `basis` d'abord) | mistral-nemo | adv 12K | 0,58 | 0,89 | 0,70 | refus corrigés, mais très indulgent (25 désaccords dans ce sens contre 1) : good_job 86 contre 73 |
+| prompt v2 | **qwen3.5:9b** | adv 12K | 0,80 | 0,90 | 0,85 | erreurs équilibrées (6 / 6) |
+| v2 + règle branche alternative | **qwen3.5:9b** | 3 runs | voir ci-dessous | | | |
+
+Une comparaison numérique faite par le code sur la valeur extraite a été simulée
+(47 accords sur 47 golds numériques d'adv 12K), puis écartée : le verdict reste
+entièrement au juge.
+
+**Résultat final, prompt figé.**
+
+| Run | Rôle | κ `correct` | κ `refused` | κ grille |
+|---|---|---:|---:|---:|
+| advanced 12K | mise au point | 0,795 | 0,975 | 0,856 |
+| grading 12K | validation | 0,851 | 0,901 | 0,877 |
+| advanced 24K | validation | 0,777 | 0,885 | 0,831 |
+| **validation (grading + adv 24K)** | | **0,814** | 0,894 | 0,855 |
+
+| Ligne | Juge | good_job | unverified | hallucinating | need_help | dont_know |
+|---|---|---:|---:|---:|---:|---:|
+| advanced 12K | Claude | 73 | 13 | 25 | 16 | 23 |
+| | qwen3.5:9b | 72 | 15 | 22 | 17 | 24 |
+| grading 12K | Claude | 74 | 14 | 26 | 14 | 22 |
+| | qwen3.5:9b | 68 | 15 | 23 | 18 | 26 |
+| advanced 24K | Claude | **79** | 13 | 17 | 22 | 19 |
+| | qwen3.5:9b | **77** | 13 | 16 | 23 | 21 |
+
+**Décision.** `qwen3.5:9b` est le juge par défaut de la grille (κ `correct` 0,814
+en validation). Il tient entièrement sur un GPU de 8 Go ; un verdict prend environ
+4 s une fois le modèle chargé (mesuré sur un appel).
+
+**Limites connues.** Les désaccords sont surtout systématiques : les mêmes
+questions reviennent d'un run à l'autre.
+
+1. **Arrondi face à un gold grossier** : qwen refuse 1,43 % contre un gold de 0,01,
+   ou 0,389 contre 0,40, que Claude accepte (Q03473, Q10420, Q05718, Q06272).
+2. **Branche alternative** : la règle ne corrige pas tout ; Q00720 reste compté
+   comme refus sur les trois runs, et Q00540 (« non pertinent » contre un gold
+   chiffré) comme correct.
+3. **Bon label obtenu par un raisonnement faux** que seuls les passages révèlent
+   (Q01226, Q00790, Q01487, Q01912). Sans les passages, ces cas sont hors de portée
+   du juge : c'est le prix du contexte minimal.
+4. **La référence n'est pas une vérité terrain.** Ce sont les verdicts d'un seul
+   juge LLM, non validés par des humains, et certains désaccords viennent d'elle
+   (Q08135, accepté par indulgence). À titre de repère, l'audit des labels humains
+   publiés par FinanceBench (450 réponses singleStore) en trouve 93 % cohérents avec
+   leur propre gold.
+
+**Conséquence pour la lecture des grilles.** Entre les deux juges, advanced 12K et
+grading s'inversent (73 / 74 chez Claude, 72 / 68 chez qwen). **Un écart de moins
+d'environ 5 good_job entre deux lignes n'est donc pas tranché par la grille** ; en
+revanche, l'avance d'advanced 24K tient avec les deux juges.

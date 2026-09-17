@@ -8,7 +8,7 @@ PROTOCOL ?= grid
 stage_config = $(if $(filter command line,$(origin CONFIG)),$(CONFIG),$(1))
 
 help:
-	@echo "financerag-bench — available commands:"
+	@echo "FinQA Engine — available commands:"
 	@echo ""
 	@echo "  make install        Install runtime (deployable) dependencies only"
 	@echo "  make install-all    Install every extra (ingestion, dev, dashboard, demo, agents) + pre-commit"

@@ -7,8 +7,8 @@
 #   make judge ANSWERS=data/processed/answers/<run>.jsonl MODEL=ollama_chat/mistral-nemo
 # Verdicts: data/processed/judged/verdicts/{answers stem}.{judge}.jsonl, then the grid:
 # data/processed/judged/{answers stem}_grid_by_{judge}.jsonl.
-# Default run: the workflow advanced row at num_ctx 24576, the current reference.
-answers_path: data/processed/answers/workflow_advanced_replay_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20.jsonl
+# Default run: the workflow grading row at num_ctx 12288, the base of the calculator work.
+answers_path: data/processed/answers/workflow/workflow_grading_replay_docling_hybrid_1024_bge-m3_ollama_chat_granite4.1:8b_k20_12kc.jsonl
 protocol: grid
 chunks_path: data/processed/docling/chunked/hybrid/chunks_1024.jsonl
 llm:

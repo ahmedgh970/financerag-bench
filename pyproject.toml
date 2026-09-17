@@ -1,7 +1,7 @@
 [project]
-name = "financerag-bench"
+name = "finqa-engine"
 version = "0.1.0"
-description = "RAG & Agentic RAG benchmark on FinanceBench — from naive to multi-agent"
+description = "Production-ready agentic RAG for financial document Q&A, benchmarked on FinanceBench"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

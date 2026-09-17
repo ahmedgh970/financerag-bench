@@ -77,9 +77,9 @@ def ask(question: str, doc_id: str, model: str, k: int, collection: str) -> tupl
 opts = _options()
 defaults = opts["defaults"]
 
-with gr.Blocks(title="financerag-bench") as demo:
+with gr.Blocks(title="FinQA Engine") as demo:
     gr.Markdown(
-        "# financerag-bench — RAG financier\n"
+        "# FinQA Engine — RAG financier\n"
         "Pose une question sur un filing SEC (FinanceBench). Réponse ancrée dans les "
         "sources récupérées, générée en local (Ollama)."
     )

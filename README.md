@@ -1,9 +1,10 @@
-# financerag-bench
+# FinQA Engine — Production-ready agentic RAG for financial document Q&A
+
+[![CI](https://github.com/ahmedgh970/finqa-engine/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedgh970/finqa-engine/actions/workflows/ci.yml) [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![License: MIT](https://img.shields.io/github/license/ahmedgh970/finqa-engine)](LICENSE) [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff) [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)<br>
+[![Orchestration: LangGraph](https://img.shields.io/badge/orchestration-LangGraph-1C3C3C?logo=langgraph&logoColor=white)](https://github.com/langchain-ai/langgraph) [![Framework: LangChain](https://img.shields.io/badge/framework-LangChain-1C3C3C?logo=langchain&logoColor=white)](https://github.com/langchain-ai/langchain) [![Vector DB: Qdrant](https://img.shields.io/badge/vector%20DB-Qdrant-4338CA?logo=qdrant&logoColor=white)](https://qdrant.tech/) [![Serving: FastAPI](https://img.shields.io/badge/serving-FastAPI-0F766E?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/) [![Local LLMs: Ollama](https://img.shields.io/badge/local%20LLMs-Ollama-0F766E?logo=ollama&logoColor=white)](https://ollama.com/) [![Parsing: Docling](https://img.shields.io/badge/parsing-Docling-4338CA)](https://github.com/docling-project/docling) [![Dataset: FinanceBench](https://img.shields.io/badge/dataset-FinanceBench-B45309)](https://github.com/patronus-ai/financebench)
 
 > End-to-end RAG & Agentic RAG benchmark on [FinanceBench](https://github.com/patronus-ai/financebench); 150 financial QA pairs, 368 SEC filings (10-K/10-Q).
 > From naive retrieval to multi-agent system, every improvement is justified by a number.
-
-![CI](https://github.com/ahmedgh970/financerag-bench/actions/workflows/ci.yml/badge.svg)
 
 ---
 
@@ -61,21 +62,53 @@ for the full comparison including BM25 and hybrid fusion):
 | **Dense + cross-encoder reranker** (default) | **0.549** | **0.649** | **0.433** | **0.473** |
 
 End-to-end generation quality on the 150 QA (corpus `docling_hybrid_1024_bge-m3`,
-`reranked(dense)`, doc-scoped), LLM-judged on `equivalent` (answer **correct AND
-grounded** in the retrieved context). Best point per model — full table, depth
-ablation and analysis in [ADR 0002](docs/adr/0002-generation-model.md):
+`reranked(dense)` with a prefetch of 50, doc-scoped), best depth per model. Every
+answer is read in full and compared with the gold on two independent axes:
 
-| Model | Params | equivalent (best k) |
-|---|---|---|
-| **granite4.1:8b** | 8.8B | **65.3** (k20) |
-| qwen3.5:4b | 4.7B | 60.0 (k20) |
-| qwen3.5:9b | 9.7B | 58.0 (k20) |
-| llama3.1:8b | 8.0B | 50.7 (k20) |
-| mistral-nemo | 12.2B | 47.3 (k5) |
-| mistral:7b | 7.2B | 41.3 (k20) |
-| granite4.1:3b | 3.4B | 40.0 (k5) |
-| command-r7b | 8.0B | 38.7 (k5) |
-| llama3.2:3b | 3.2B | 28.7 (k10) |
+- **correct**: the final value or conclusion agrees with the gold answer;
+- **grounded**: the reasoning behind it rests on the retrieved passages, not on
+  invented figures or unjustified assumptions;
+- **equivalent** = correct **and** grounded, the headline metric;
+- **Prometheus**: mean 1–5 score from the open Prometheus-2 judge on its verbatim
+  Absolute Grading rubric, run locally. It is validated to rank systems the same way
+  (Spearman ρ = 0.93, [ADR 0003](docs/adr/0003-prometheus-judge.md)); read it as a
+  ranking, not as an absolute grade.
+
+Our rows are judged by Claude on the correct / grounded protocol. The FinanceBench
+rows are the answers published with the benchmark for its `singleStore` setting (one
+Chroma vector store per filing with OpenAI `text-embedding-ada-002` embeddings, the
+closest to our doc-scoped retrieval; generated in November 2023 at temperature
+0.01). Their `correct` is the benchmark's human label after an answer-by-answer
+audit: 93% of the published labels were kept; the others were corrected where they
+disagreed with the benchmark's own gold answer, its rounding or its refusal
+definition. Those runs publish no retrieved passages, so `grounded` and
+`equivalent` cannot be measured for them. They differ
+from ours in model, retrieval and grader, so read them as a reference point rather
+than a controlled comparison. Full table, depth ablation and analysis in
+[ADR 0002](docs/adr/0002-generation-model.md).
+
+| Model | Params | Setting | equivalent | correct | grounded | Prometheus (1–5) |
+|---|---|---|---:|---:|---:|---:|
+| **granite4.1:8b** | 8.8B | k20 | **65.3** | **65.3** | 87.3 | **4.15** |
+| granite4.1:8b + grader | 8.8B | k20, CRAG grading | 61.3 | 62.7 | 85.3 | pending |
+| qwen3.5:4b | 4.7B | k20 | 60.0 | 60.0 | **99.3** | 4.07 |
+| qwen3.5:9b | 9.7B | k20 | 58.0 | 58.7 | **99.3** | 3.70 |
+| llama3.1:8b | 8.0B | k20 | 50.7 | 50.7 | 92.7 | 3.17 |
+| mistral-nemo | 12.2B | k5 | 47.3 | 48.7 | 77.3 | pending |
+| mistral:7b | 7.2B | k20 | 41.3 | 41.3 | 92.0 | pending |
+| granite4.1:3b | 3.4B | k5 | 40.0 | 42.7 | 74.7 | pending |
+| command-r7b | 8.0B | k5 | 38.7 | 40.0 | 68.7 | pending |
+| llama3.2:3b | 3.2B | k10 | 28.7 | 28.7 | 89.3 | pending |
+| *FinanceBench* gpt-4-1106-preview (GPT-4 Turbo) | undisclosed | singleStore | — | 48.0 | — | pending |
+| *FinanceBench* gpt-4 | undisclosed | singleStore | — | 41.3 | — | pending |
+| *FinanceBench* llama-2-70b-chat | 70B | singleStore | — | 37.3 | — | pending |
+
+The grader row is the CRAG workflow's per-passage grading (0–3, floor of 3
+passages) on the same replayed top-20. It was generated at `num_ctx` 12288 while the
+plain k20 row used 30720, so the gap between the two mixes the grader's effect with
+the context window's; [ADR 0004](docs/adr/0004-crag-workflow-evidence-grid.md)
+compares them at equal window. It costs about 20 LLM calls per question instead of
+one.
 
 Key finding: **useful retrieval depth scales with model capability** — the
 k10→k20 step only helps the strongest models (flat for the 3B tier). See ADR 0002.
@@ -94,7 +127,12 @@ together place the answer in one of five outcomes:
 - **Hallucinating**: wrong, and the gold evidence never reached the prompt.
 - **Don't know**: refusal.
 
-Full grid, per-question transitions and failure analysis are in
+The verdicts behind this table are Claude's. `make judge` reproduces the grid with a
+local judge, `qwen3.5:9b`, validated against those verdicts on runs held out from
+prompt tuning (kappa 0.81 on correct): the two judges agree on the ranking of the
+best row, but a gap of fewer than about 5 good jobs between two rows is within their
+disagreement and should not be read as a difference. Full grid, per-question
+transitions, failure analysis and the judge validation are in
 [ADR 0004](docs/adr/0004-crag-workflow-evidence-grid.md).
 
 | Workflow row | Good job | Unverified | Hallucinating | Need help | Don't know | Evidence in prompt | Latency / Q | LLM calls / Q |
@@ -219,7 +257,7 @@ generator falls back to CPU when both compete for VRAM.
 ## Project Structure
 
 ```
-financerag-bench/
+finqa-engine/
 ├── README.md
 ├── docs/                          # ADRs (tracked); measurement dumps kept local
 ├── configs/                       # 1 YAML = 1 reproducible experiment, grouped by stage

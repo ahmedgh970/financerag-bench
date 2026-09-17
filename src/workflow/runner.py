@@ -5,8 +5,9 @@ sources + the workflow instrumentation (rewrite rounds, calculator trigger,
 per-node latency) to a JSONL for later judging. Resumable: QA ids already in the
 output file are skipped, so an interrupted run continues where it stopped.
 
-The output filename encodes the ablation cell, so each row of the matrix is a
-separate experiment instead of overwriting the previous one.
+The output filename encodes the ablation cell and the pinned context window, so each
+row of the matrix, and each window a row is run at, is a separate experiment instead
+of overwriting the previous one.
 
 Usage:
     python -m src.workflow.runner --config configs/workflow/advanced.yaml
@@ -47,13 +48,29 @@ def _select(qas: list[QAItem], qa_id: str | None) -> list[QAItem]:
     return selected
 
 
+def _context_tag(num_ctx: int | None) -> str:
+    """Short name of the pinned context window: ``12kc`` for 12288 tokens.
+
+    Empty when the window is not pinned (the client then sizes it per prompt); a
+    window that is not a multiple of 1024 keeps its exact size (``10000c``).
+    """
+    if num_ctx is None:
+        return ""
+    return f"{num_ctx // 1024}kc" if num_ctx % 1024 == 0 else f"{num_ctx}c"
+
+
 def _output_path(config: WorkflowConfig) -> Path:
-    """One file per (ablation cell, retriever, corpus, LLM, k)."""
+    """One file per (ablation cell, retriever, corpus, LLM, k, context window).
+
+    The window is part of a row's definition: it decides how many passages survive
+    the trim, and the same prompt answered at two windows gives different answers.
+    """
     model = config.llm.model.replace("/", "_")
+    ctx = _context_tag(config.llm.num_ctx)
     return (
-        Path("data/processed/answers")
+        Path("data/processed/answers/workflow")
         / f"workflow_{variant_name(config)}_{config.retriever}_{config.collection_name}"
-        f"_{model}_k{config.k}.jsonl"
+        f"_{model}_k{config.k}{f'_{ctx}' if ctx else ''}.jsonl"
     )
 
 

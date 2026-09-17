@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
     _retrievers.clear()
 
 
-app = FastAPI(title="financerag-bench", lifespan=lifespan)
+app = FastAPI(title="FinQA Engine", lifespan=lifespan)
 
 
 class AskRequest(BaseModel):
