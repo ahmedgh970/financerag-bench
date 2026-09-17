@@ -11,10 +11,11 @@ from __future__ import annotations
 
 from types import ModuleType
 
-from src.evaluation.judge.protocols import correct_grounded, prometheus
+from src.evaluation.judge.protocols import correct_grounded, grid, prometheus
 
 PROTOCOLS: dict[str, ModuleType] = {
     "correct_grounded": correct_grounded,
+    "grid": grid,
     "prometheus": prometheus,
 }
 

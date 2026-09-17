@@ -82,22 +82,26 @@ k10→k20 step only helps the strongest models (flat for the 3B tier). See ADR 0
 
 **CRAG workflow.** The deterministic LangGraph workflow (`src/workflow/`) replays
 the same `reranked(dense)` top-20 passages for every row and generates with
-`granite4.1:8b`. Each answer is placed in one of four outcomes, based on whether
-the gold evidence page actually reached the prompt:
+`granite4.1:8b`. A judge only reads each answer (correct? refused?); the code then
+checks whether the gold evidence page actually reached the prompt, and the two
+together place the answer in one of five outcomes:
 
-- **Good job**: correct and grounded.
-- **Hallucinating**: answers without the evidence.
-- **Need help**: wrong although the evidence was in the prompt.
+- **Good job**: correct, with the gold evidence in the prompt.
+- **Unverified**: correct but unverified in the context — the gold evidence never
+  reached the prompt, so the answer may rest on another passage (an MD&A table
+  repeating the statement, say) or on luck.
+- **Need help**: wrong although the gold evidence was in the prompt (generation failure).
+- **Hallucinating**: wrong, and the gold evidence never reached the prompt.
 - **Don't know**: refusal.
 
 Full grid, per-question transitions and failure analysis are in
 [ADR 0004](docs/adr/0004-crag-workflow-evidence-grid.md).
 
-| Workflow row | Good job | Hallucinating | Need help | Don't know | Evidence in prompt | Latency / Q | LLM calls / Q |
-|---|---|---|---|---|---|---|---|
-| advanced, `num_ctx` 12288 (~10 passages) | 79 | 32 | 16 | 23 | 93 | 107 s | 1 |
-| grading 0–3 + floor of 3, `num_ctx` 12288 | 83 | 31 | 14 | 22 | 92 | 161 s | 20.9 |
-| **advanced, `num_ctx` 24576 (~20 passages)** | **88** | **21** | 22 | **19** | **105** | 187 s | 1 |
+| Workflow row | Good job | Unverified | Hallucinating | Need help | Don't know | Evidence in prompt | Latency / Q | LLM calls / Q |
+|---|---|---|---|---|---|---|---|---|
+| advanced, `num_ctx` 12288 (~10 passages) | 73 | 13 | 25 | 16 | 23 | 93 | 107 s | 1 |
+| grading 0–3 + floor of 3, `num_ctx` 12288 | 74 | 14 | 26 | 14 | 22 | 92 | 161 s | 20.9 |
+| **advanced, `num_ctx` 24576 (~20 passages)** | **79** | 13 | **17** | 22 | **19** | **105** | 187 s | 1 |
 
 Key finding: the larger window is the best row, but only 4 of its 16 gains over
 the 12K window come from newly retrieved evidence. The rest reflect how
@@ -172,11 +176,11 @@ make eval-retrieval CONFIG=configs/evaluation/retrieval/chunks512_reranked_dense
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml                            # all 150 QA
 make answer CONFIG=configs/rag/naive_reranked_dense_1024_k10_ollama.yaml ID=financebench_id_03029  # one QA
 
-# 6. Score the answers (one config per family, the answers file picked with ANSWERS=)
-make judge ANSWERS=data/processed/answers/<run>.jsonl                          # LLM judge, correct / grounded
+# 6. Score the answers (the answers file picked with ANSWERS=, the judge protocol with PROTOCOL=)
+make judge ANSWERS=data/processed/answers/<run>.jsonl                          # outcome grid (PROTOCOL=grid, default)
 make judge ANSWERS=data/processed/answers/<run>.jsonl MODEL=ollama_chat/qwen3.5:9b  # another judge model
-make judge JUDGE=prometheus ANSWERS='data/processed/answers/*_k20.jsonl'       # Prometheus-2, 1-5 rubric
-make grid ANSWERS=data/processed/answers/<run>.jsonl                           # outcome grid from verdicts
+make judge PROTOCOL=correct_grounded ANSWERS=data/processed/answers/<run>.jsonl     # correct / grounded
+make judge PROTOCOL=prometheus ANSWERS='data/processed/answers/*_k20.jsonl'    # Prometheus-2, 1-5 rubric
 make ragas ANSWERS=data/processed/answers/<run>.jsonl LIMIT=50                 # faithfulness, answer relevancy
 ```
 
@@ -226,7 +230,7 @@ financerag-bench/
 │   ├── workflow/                  # CRAG workflow rows (advanced, grading)
 │   └── evaluation/
 │       ├── retrieval/             # one config per retriever setup (chunks512_*)
-│       ├── judge/                 # correct_grounded, prometheus, evidence_grid
+│       ├── judge/                 # one config per protocol: grid, correct_grounded, prometheus
 │       └── ragas/                 # ragas (critic, metrics, context window)
 ├── data/
 │   ├── pdfs/                      # 368 docs
