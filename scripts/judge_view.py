@@ -7,8 +7,8 @@ shared by several runs are printed once and referenced by id, and those sitting
 on a gold page are flagged. Meant to be read question by question, never truncated.
 
     uv run python scripts/judge_view.py --start 1 --count 150 \
-        --answers advanced=data/processed/answers/workflow_advanced_...jsonl \
-        --answers grading=data/processed/answers/workflow_grading_...jsonl \
+        --answers advanced=data/processed/answers/workflow/workflow_advanced_..._24kc.jsonl \
+        --answers grading=data/processed/answers/workflow/workflow_grading_..._12kc.jsonl \
         --out-dir /tmp/views
 """
 

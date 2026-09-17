@@ -225,3 +225,17 @@ def test_a_single_oversized_passage_still_reaches_the_prompt(monkeypatch):
     result = answer_workflow("q", FakeRetriever([huge]), config)
 
     assert [c.chunk_id for c in result.sources] == ["big"]
+
+
+def test_output_file_names_the_pinned_context_window():
+    import src.workflow.runner as runner_mod
+
+    stem = "workflow_grading_reranked_test_collection_ollama_chat_granite4.1:8b_k20"
+    cfg = _config(k=20, grading={"enabled": True}, llm={"model": "ollama_chat/granite4.1:8b"})
+    assert runner_mod._output_path(cfg).name == f"{stem}.jsonl"  # window sized per prompt
+    assert runner_mod._output_path(cfg).parent == Path("data/processed/answers/workflow")
+
+    pinned = cfg.model_copy(update={"llm": cfg.llm.model_copy(update={"num_ctx": 12288})})
+    assert runner_mod._output_path(pinned).name == f"{stem}_12kc.jsonl"
+    odd = cfg.model_copy(update={"llm": cfg.llm.model_copy(update={"num_ctx": 10000})})
+    assert runner_mod._output_path(odd).name == f"{stem}_10000c.jsonl"
