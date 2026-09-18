@@ -113,7 +113,8 @@ def run(
                 "gold_answer": qa.answer,
                 "generated_answer": result.answer,
                 "sources": [
-                    {"doc_id": c.doc_id, "page": c.page, "text": c.text} for c in result.sources
+                    {"chunk_id": c.chunk_id, "doc_id": c.doc_id, "page": c.page, "text": c.text}
+                    for c in result.sources
                 ],
                 "latency_s": result.latency_s,
                 "n_retrieved": result.n_retrieved,
