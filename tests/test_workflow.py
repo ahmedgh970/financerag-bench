@@ -65,8 +65,8 @@ def test_variant_name_covers_the_ablation_matrix():
 def test_shipped_configs_share_one_retrieval_and_differ_by_one_switch():
     """Attribution rests on this: the rows must differ by the node under test alone."""
     rows = {
-        name: load_workflow_config(f"configs/workflow/{name}.yaml")
-        for name in ("advanced", "grading")
+        name: load_workflow_config(f"configs/workflow/{file}.yaml")
+        for name, file in (("advanced", "advanced"), ("grading", "grading_1024"))
     }
     # Same retrieval, replayed from the same file, so passages are byte-identical.
     assert {c.retriever for c in rows.values()} == {"replay"}
@@ -239,3 +239,11 @@ def test_output_file_names_the_pinned_context_window():
     assert runner_mod._output_path(pinned).name == f"{stem}_12kc.jsonl"
     odd = cfg.model_copy(update={"llm": cfg.llm.model_copy(update={"num_ctx": 10000})})
     assert runner_mod._output_path(odd).name == f"{stem}_10000c.jsonl"
+
+
+def test_the_chunk_size_row_differs_from_the_grading_row_by_its_corpus_alone():
+    base = load_workflow_config("configs/workflow/grading_1024.yaml").model_dump()
+    small = load_workflow_config("configs/workflow/grading_256.yaml").model_dump()
+    corpus = {"chunks_path", "collection_name", "replay_path"}
+    assert {k for k in base if base[k] != small[k]} == corpus
+    assert "256" in small["collection_name"] and "256" in small["replay_path"]
